@@ -1,0 +1,8 @@
+# חומרי מקור (מצגת PowerPoint וספר PDF מוגן בזכויות יוצרים)
+מצגת לשיעור מס' 2/
+# גיבויים אוטומטיים של העורך
+decks/_backup/
+# קבצי מערכת
+Thumbs.db
+desktop.ini
+.DS_Store

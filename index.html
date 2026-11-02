@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מצגות · כלים דיגיטליים א׳</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="assets/deck.css">
+  <style>
+    .dcard .edit { font: inherit; font-size: .85rem; background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 3px 12px; cursor: pointer; color: var(--ink); text-decoration: none; align-self: flex-start; margin-top: 8px; }
+    .dcard .edit:hover { background: var(--ink); color: var(--cream); }
+    .editmode { display: none; background: #fbe3d4; color: #7a2a08; border-radius: 4px; padding: 8px 14px; margin-bottom: 18px; font-size: .95rem; }
+  </style>
+</head>
+<body>
+  <div class="home">
+    <header><div>
+      <h1>מצגות</h1>
+      <p>כלים דיגיטליים א׳ · מנחם שיינין · סמסטר א׳ תשפ״ז</p>
+    </div></header>
+    <main>
+      <div class="editmode" id="editmode">מצב עריכה פעיל: אפשר לערוך מצגות וליצור חדשות.</div>
+      <div class="decks" id="decks"></div>
+    </main>
+  </div>
+  <script src="decks/manifest.js"></script>
+  <script>
+    const root = document.getElementById('decks');
+    const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    let canEdit = false;
+
+    function draw() {
+      root.replaceChildren();
+      window.MANIFEST.forEach((m) => {
+        const live = !!m.id;
+        const card = mk(live ? 'a' : 'div', 'dcard ' + (live ? 'live' : 'soon'));
+        if (live) card.href = 'deck.html?d=' + encodeURIComponent(m.id);
+        card.append(mk('div', 'no', m.n), mk('h3', '', m.title), mk('div', 'meta', m.date + (m.desc ? ' · ' + m.desc : '')), mk('div', 'go', live ? 'פתח מצגת ←' : 'בקרוב'));
+        if (canEdit) {
+          if (live) {
+            const a = mk('a', 'edit', 'ערוך');
+            a.href = 'edit.html?d=' + encodeURIComponent(m.id);
+            a.addEventListener('click', (e) => e.stopPropagation());
+            card.append(a);
+          } else {
+            const b = mk('button', 'edit', 'צור מצגת');
+            b.addEventListener('click', async () => {
+              b.disabled = true;
+              try {
+                const r = await fetch('/api/new-deck', { method: 'POST', headers: { 'X-Deck-Edit': '1' }, body: JSON.stringify({ n: m.n }) });
+                const j = await r.json();
+                if (!r.ok || !j.ok) throw new Error(j.error || r.status);
+                location.href = 'edit.html?d=' + encodeURIComponent(j.id);
+              } catch (e) { alert('היצירה נכשלה: ' + e.message); b.disabled = false; }
+            });
+            card.append(b);
+          }
+        }
+        root.append(card);
+      });
+    }
+    draw();
+
+    if (location.protocol.startsWith('http')) {
+      fetch('/api/ping', { cache: 'no-store' }).then((r) => r.ok && r.json()).then((j) => {
+        if (j && j.ok) { canEdit = true; document.getElementById('editmode').style.display = 'block'; draw(); }
+      }).catch(() => {});
+    }
+  </script>
+</body>
+</html>
