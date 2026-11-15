@@ -280,6 +280,8 @@
       { k: 'font', t: 'select', label: 'גופן', opts: [['he', 'Heebo'], ['arial', 'Arial'], ['serif', 'Georgia']] },
       { k: 'list', t: 'select', label: 'רשימה', opts: [['', 'ללא'], ['bullet', 'תבליטים'], ['number', 'מספור']] },
       { k: 'lh', t: 'num', label: 'גובה שורה (למשל 1.25)' },
+      { k: 'valign', t: 'select', label: 'יישור אנכי', opts: [['', 'למעלה'], ['middle', 'אמצע'], ['bottom', 'למטה']] },
+      { k: 'dir', t: 'select', label: 'כיוון הטקסט', opts: [['', 'אוטומטי'], ['rtl', 'מימין לשמאל'], ['ltr', 'משמאל לימין']] },
       { k: 'link', t: 'text', label: 'קישור (לא חובה)' },
     ],
     image: [
@@ -287,6 +289,13 @@
       { k: 'fit', t: 'select', label: 'התאמה', opts: [['cover', 'למלא (חיתוך)'], ['contain', 'להציג שלמה']] },
       { k: 'bg', t: 'color', label: 'רקע (לא חובה)' },
       { k: 'alt', t: 'text', label: 'תיאור התמונה' },
+    ],
+    shape: [
+      { k: 'fill', t: 'color', label: 'צבע מילוי' },
+      { k: 'stroke', t: 'color', label: 'צבע קו' },
+      { k: 'sw', t: 'num', label: 'עובי קו' },
+      { k: 'flip', t: 'select', label: 'היפוך', opts: [['', 'ללא'], ['h', 'אופקי']] },
+      { k: 'rot', t: 'num', label: 'סיבוב (מעלות)' },
     ],
     table: [
       { k: 'rows', t: 'long', rows: 6, label: 'שורות (תאים מופרדים ב-|)' },
@@ -299,12 +308,14 @@
   const itemName = (it) => {
     if (it.kind === 'image') return '🖼 ' + (it.alt || (it.src || '').split('/').pop() || 'תמונה');
     if (it.kind === 'table') return '▦ טבלה';
+    if (it.kind === 'shape') return '➜ ' + ({ arrow: 'חץ', line: 'קו', path: 'עקומה' }[it.shape] || 'צורה');
     return 'T ' + String(it.text || '').split('\n')[0].slice(0, 28);
   };
   function addItem(kind) {
     const s = deck.slides[sel];
     const base = { text: { kind: 'text', text: 'טקסט חדש', x: 480, y: 420, w: 960, h: 120, size: 56, bold: '', color: '#0A0A0A', align: 'right', font: 'he', lh: 1.25, list: '', link: '' },
       image: { kind: 'image', src: '', alt: '', fit: 'contain', bg: '', x: 560, y: 240, w: 800, h: 600 },
+      shape: { kind: 'shape', shape: 'arrow', fill: '#C00000', stroke: '', sw: 0, flip: 'h', rot: 0, x: 800, y: 480, w: 200, h: 100 },
       table: { kind: 'table', rows: 'כותרת א | כותרת ב\nתא | תא\nתא | תא', colw: '50,50', header: 'yes', size: 36, color: '#0A0A0A', x: 240, y: 300, w: 1440, h: 300 } }[kind];
     s.items.push(clone(base)); selItem = s.items.length - 1; structural();
   }
@@ -320,7 +331,8 @@
       h('div', { class: 'cvbar' },
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('text') }, '+ טקסט'),
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('image') }, '+ תמונה'),
-        h('button', { class: 'primary', type: 'button', onclick: () => addItem('table') }, '+ טבלה')),
+        h('button', { class: 'primary', type: 'button', onclick: () => addItem('table') }, '+ טבלה'),
+        h('button', { class: 'primary', type: 'button', onclick: () => addItem('shape') }, '+ חץ')),
       h('div', { class: 'cvlist' }, s.items.map((it, i) =>
         h('button', { type: 'button', class: 'cvb' + (i === selItem ? ' on' : ''), onclick: () => { selItem = i; renderPreview(); renderForm(); } }, itemName(it)))));
     const it = s.items[selItem];

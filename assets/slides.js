@@ -540,15 +540,29 @@
       inner = h('table', { style: { fontSize: (it.size || 32) + 'px', color: it.color || '#0A0A0A', fontFamily: CV_FONTS[it.font] || CV_FONTS.he } },
         rows.map((r, ri) => h('tr', {}, r.map((c, ci) =>
           h(ri === 0 && it.header !== 'no' ? 'th' : 'td', { style: { width: cw[ci] ? cw[ci] + '%' : '', textAlign: it.align || 'right' } }, c)))));
+    } else if (it.kind === 'shape') {
+      const w = it.w || 100, hh = it.h || 100, fill = it.fill || 'none', stroke = it.stroke || 'none', sw = it.sw || 0;
+      let g;
+      if (it.shape === 'line') g = '<line x1="0" y1="0" x2="' + w + '" y2="' + hh + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linecap="round"/>';
+      else if (it.shape === 'path') g = '<path d="' + String(it.path || '').replace(/"/g, '') + '" fill="' + (it.fill || 'none') + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linecap="round" vector-effect="non-scaling-stroke" transform="scale(' + (w / (it.vw || w)) + ' ' + (hh / (it.vh || hh)) + ')"/>';
+      else { // חץ ימינה (הפוך בעזרת flip)
+        const head = Math.min(w, hh) * 0.5, top = hh * 0.25, bot = hh * 0.75, nk = Math.max(0, w - head);
+        g = '<polygon points="0,' + top + ' ' + nk + ',' + top + ' ' + nk + ',0 ' + w + ',' + hh / 2 + ' ' + nk + ',' + hh + ' ' + nk + ',' + bot + ' 0,' + bot + '" fill="' + fill + '"/>';
+      }
+      inner = h('div', { html: '<svg width="' + w + '" height="' + hh + '" viewBox="0 0 ' + w + ' ' + hh + '" style="overflow:visible;display:block" xmlns="http://www.w3.org/2000/svg">' + g + '</svg>' });
     } else {
       Object.assign(st, {
         fontSize: (it.size || 40) + 'px', fontWeight: it.bold ? 700 : 400, color: it.color || '#0A0A0A', textAlign: it.align || 'right',
         lineHeight: String(it.lh || 1.25), fontFamily: CV_FONTS[it.font] || CV_FONTS.he,
       });
       const ls = String(it.text || '').split('\n');
+      st.direction = it.dir || (/[֐-׿]/.test(it.text || '') ? 'rtl' : 'ltr'); // לועזית בלבד: סדר סימנים ומספרים נכון
+      if (it.valign === 'middle' || it.valign === 'bottom') Object.assign(st, { display: 'flex', flexDirection: 'column', justifyContent: it.valign === 'middle' ? 'center' : 'flex-end' });
       const body = it.list ? h(it.list === 'number' ? 'ol' : 'ul', {}, ls.map((l) => h('li', {}, l))) : h('div', { class: 'cv-t' }, lines(it.text));
-      inner = it.link ? h('a', { href: it.link, target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, body) : body;
+      inner = it.link ? h('a', { href: it.link, target: '_blank', rel: 'noopener', style: { color: 'inherit', textDecoration: 'none' } }, body) : body;
     }
+    const tf = [it.rot ? 'rotate(' + it.rot + 'deg)' : '', it.flip === 'h' ? 'scaleX(-1)' : ''].filter(Boolean).join(' ');
+    if (tf) st.transform = tf;
     return h('div', { class: 'ci ci-' + (it.kind || 'text'), 'data-i': i, style: st }, inner);
   };
   TYPES.canvas = {
