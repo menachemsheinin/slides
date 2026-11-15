@@ -147,8 +147,8 @@
       h('button', { onclick: () => prev(), title: 'הקודם' }, '→'),
       cnt,
       h('button', { onclick: () => next(), title: 'הבא' }, '←'),
-      h('button', { onclick: () => toggleOv(), title: 'תוכן (O)' }, 'תוכן'),
-      h('button', { onclick: () => notes.classList.toggle('on'), title: 'תוכן השקופית (N)' }, 'תוכן'),
+      h('button', { onclick: () => toggleOv(), title: 'כל השקפים (O)' }, 'כל השקפים'),
+      h('button', { onclick: () => notes.classList.toggle('on'), title: 'תוכן השקופית (N)' }, 'תוכן השקופית'),
       h('button', { onclick: () => fullscreen(), title: 'מסך מלא (F)' }, 'מסך מלא'),
       h('a', { href: 'index.html' }, 'כל המצגות'));
     document.body.append(view, progress, ctrl, notes, ov);
