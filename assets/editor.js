@@ -228,6 +228,7 @@
       const i = +n.dataset.i;
       n.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
+        if (n.isContentEditable) { e.stopPropagation(); return; }
         e.preventDefault(); e.stopPropagation();
         selectItem(i);
         const cur = stage.querySelector('.cv [data-i="' + i + '"]');
@@ -235,6 +236,34 @@
       });
     });
     cv.addEventListener('pointerdown', (e) => { if (e.target === cv && selItem !== -1) { selItem = -1; renderPreview(); renderForm(); } });
+    cv.addEventListener('dblclick', (e) => {
+      const t = e.target.closest && e.target.closest('.ci');
+      if (!t) return;
+      const i = +t.dataset.i, itm = s.items[i];
+      if (!itm || (itm.kind || 'text') !== 'text') return;
+      if (selItem !== i) { selItem = i; renderPreview(); renderForm(); }
+      editInline(s, i);
+    });
+    /* קווי עזר */
+    (s.guides || []).forEach((g, gi) => {
+      const v = g.o === 'v';
+      const gn = h('div', { class: 'cvg ' + (v ? 'cvg-v' : 'cvg-h'), title: 'גררו להזזה, גררו אל מחוץ לשקף למחיקה', style: v ? { left: g.p - 6 + 'px' } : { top: g.p - 6 + 'px' } });
+      gn.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const k = cv.getBoundingClientRect().width / 1920 || 1, r = cv.getBoundingClientRect();
+        const mv = (ev) => {
+          g.p = Math.round(v ? (ev.clientX - r.left) / k : (ev.clientY - r.top) / k);
+          gn.style[v ? 'left' : 'top'] = g.p - 6 + 'px';
+        };
+        const up = () => {
+          removeEventListener('pointermove', mv); removeEventListener('pointerup', up);
+          if (g.p < 0 || g.p > (v ? 1920 : 1080)) s.guides.splice(gi, 1);
+          snap(); renderPreview(); renderForm();
+        };
+        addEventListener('pointermove', mv); addEventListener('pointerup', up);
+      });
+      cv.append(gn);
+    });
     const it = s.items[selItem];
     const n = it && cv.querySelector('[data-i="' + selItem + '"]');
     if (n) {
@@ -242,29 +271,90 @@
       ['nw', 'ne', 'sw', 'se'].forEach((pos) => n.append(h('i', { class: 'hd hd-' + pos, onpointerdown: (e) => { e.preventDefault(); e.stopPropagation(); startDrag(e, s, selItem, n, pos); } })));
     }
   }
+  /* ---------- עריכת טקסט בתוך התיבה ---------- */
+  function editInline(s, i) {
+    const n = stage.querySelector('.cv [data-i="' + i + '"]'), it = s.items[i];
+    if (!n || n.isContentEditable) return;
+    n.classList.add('editing');
+    n.textContent = it.text || '';
+    n.style.whiteSpace = 'pre-wrap';
+    n.setAttribute('contenteditable', 'plaintext-only');
+    if (!n.isContentEditable) n.setAttribute('contenteditable', 'true');
+    n.focus();
+    const r = document.createRange(); r.selectNodeContents(n);
+    const sel_ = getSelection(); sel_.removeAllRanges(); sel_.addRange(r);
+    const read = () => String(n.innerText || '').replace(/\r/g, '').replace(/\n$/, '');
+    n.addEventListener('input', () => { it.text = read(); updateStatus(); clearTimeout(snapT); snapT = setTimeout(snap, 600); renderForm(); });
+    n.addEventListener('keydown', (ev) => { ev.stopPropagation(); if (ev.key === 'Escape') n.blur(); });
+    n.addEventListener('blur', () => { it.text = read(); changed(); snap(); renderPreview(); renderForm(); }, { once: true });
+  }
+
+  /* ---------- הצמדה לקווי עזר ולאלמנטים ---------- */
+  function snapTargets(s, i, cv) {
+    const X = [0, 960, 1920], Y = [0, 540, 1080];
+    (s.guides || []).forEach((g) => (g.o === 'v' ? X : Y).push(g.p));
+    cv.querySelectorAll('.ci').forEach((el) => {
+      if (+el.dataset.i === i) return;
+      const x = el.offsetLeft, y = el.offsetTop, w = el.offsetWidth, hh = el.offsetHeight;
+      X.push(x, x + w / 2, x + w); Y.push(y, y + hh / 2, y + hh);
+    });
+    return { X, Y };
+  }
+  const snapDelta = (vals, targets, thr) => {
+    let best = null;
+    vals.forEach((v) => targets.forEach((t) => { const d = t - v; if (Math.abs(d) <= thr && (best === null || Math.abs(d) < Math.abs(best.d))) best = { d, t }; }));
+    return best;
+  };
+  function showSnap(cv, xs, ys) {
+    cv.querySelectorAll('.cvs').forEach((e) => e.remove());
+    xs.forEach((p) => cv.append(h('div', { class: 'cvs cvs-v', style: { left: p - 2 + 'px' } })));
+    ys.forEach((p) => cv.append(h('div', { class: 'cvs cvs-h', style: { top: p - 2 + 'px' } })));
+  }
   function startDrag(e, s, i, n, mode) {
     const it = s.items[i];
     const cv = stage.querySelector('.cv');
     const k = cv.getBoundingClientRect().width / 1920 || 1;
     const sx = e.clientX, sy = e.clientY;
     const o = { x: it.x || 0, y: it.y || 0, w: it.w || 200, h: it.h || n.offsetHeight || 100 };
+    const tg = snapOn ? snapTargets(s, i, cv) : null, thr = 8 / (k * 1.5);
     let moved = false;
     const move = (ev) => {
       const dx = Math.round((ev.clientX - sx) / k), dy = Math.round((ev.clientY - sy) / k);
       if (!dx && !dy && !moved) return;
       moved = true;
-      if (mode === 'move') { it.x = o.x + dx; it.y = o.y + dy; }
-      else {
-        if (mode.includes('e')) it.w = Math.max(40, o.w + dx);
-        if (mode.includes('w')) { it.w = Math.max(40, o.w - dx); it.x = o.x + o.w - it.w; }
-        if (mode.includes('s')) it.h = Math.max(24, o.h + dy);
-        if (mode.includes('n')) { it.h = Math.max(24, o.h - dy); it.y = o.y + o.h - it.h; }
+      const free = ev.altKey || !tg;
+      let hx = [], hy = [];
+      if (mode === 'move') {
+        it.x = o.x + dx; it.y = o.y + dy;
+        if (!free) {
+          const w = it.w || o.w, hh = it.h || o.h;
+          const a = snapDelta([it.x, it.x + w / 2, it.x + w], tg.X, thr), b = snapDelta([it.y, it.y + hh / 2, it.y + hh], tg.Y, thr);
+          if (a) { it.x += a.d; hx.push(a.t); }
+          if (b) { it.y += b.d; hy.push(b.t); }
+        }
+      } else {
+        let L = o.x, T = o.y, R = o.x + o.w, B = o.y + o.h;
+        if (mode.includes('e')) R += dx;
+        if (mode.includes('w')) L += dx;
+        if (mode.includes('s')) B += dy;
+        if (mode.includes('n')) T += dy;
+        if (!free) {
+          if (mode.includes('e')) { const a = snapDelta([R], tg.X, thr); if (a) { R += a.d; hx.push(a.t); } }
+          if (mode.includes('w')) { const a = snapDelta([L], tg.X, thr); if (a) { L += a.d; hx.push(a.t); } }
+          if (mode.includes('s')) { const a = snapDelta([B], tg.Y, thr); if (a) { B += a.d; hy.push(a.t); } }
+          if (mode.includes('n')) { const a = snapDelta([T], tg.Y, thr); if (a) { T += a.d; hy.push(a.t); } }
+        }
+        it.w = Math.max(40, Math.round(R - L)); it.h = Math.max(24, Math.round(B - T));
+        it.x = mode.includes('w') ? Math.round(R - it.w) : Math.round(L); it.y = mode.includes('n') ? Math.round(B - it.h) : Math.round(T);
       }
+      it.x = Math.round(it.x); it.y = Math.round(it.y);
+      showSnap(cv, hx, hy);
       n.style.left = it.x + 'px'; n.style.top = it.y + 'px'; n.style.width = it.w + 'px'; n.style.height = it.h ? it.h + 'px' : 'auto';
       updateStatus();
     };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      cv.querySelectorAll('.cvs').forEach((x) => x.remove());
       if (moved) { changed(); snap(); renderForm(); }
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
@@ -329,6 +419,12 @@
     body.append(
       wrapField({ label: 'רקע השקף' }, h('input', { type: 'color', value: s.bg || '#FFFFFF', oninput: (e) => { s.bg = e.target.value; changed(); } })),
       h('div', { class: 'cvbar' },
+        h('button', { type: 'button', title: 'קו עזר אנכי (גררו להזזה; מחוץ לשקף = מחיקה)', onclick: () => addGuide('v') }, '+ קו עזר אנכי'),
+        h('button', { type: 'button', title: 'קו עזר אופקי', onclick: () => addGuide('h') }, '+ קו עזר אופקי'),
+        (s.guides || []).length ? h('button', { type: 'button', onclick: () => { s.guides = []; structural(); } }, 'נקה קווים') : null,
+        h('label', { class: 'cvsnap', title: 'הצמדה לקווי עזר, לקצוות ולמרכז של רכיבים אחרים (Alt בזמן גרירה מבטל זמנית)' },
+          h('input', { type: 'checkbox', checked: snapOn, onchange: (e) => { snapOn = e.target.checked; try { localStorage.setItem('edSnap', snapOn ? '1' : '0'); } catch (_) {} } }), ' הצמדה')),
+      h('div', { class: 'cvbar' },
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('text') }, '+ טקסט'),
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('image') }, '+ תמונה'),
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('table') }, '+ טבלה'),
@@ -348,6 +444,13 @@
     const pos = h('div', { class: 'cvpos' });
     buildFields(ITEM_POS, it, pos, it);
     body.append(box, h('span', { class: 'lbl' }, 'מיקום וגודל'), pos);
+  }
+  let snapOn = true;
+  try { snapOn = localStorage.getItem('edSnap') !== '0'; } catch (_) {}
+  function addGuide(o) {
+    const s = deck.slides[sel];
+    (s.guides = s.guides || []).push({ o, p: o === 'v' ? 960 : 540 });
+    structural();
   }
   function dupItem() {
     const s = deck.slides[sel], it = clone(s.items[selItem]);
@@ -615,7 +718,7 @@
 
   /* ---------- מקשים ---------- */
   document.addEventListener('keydown', (e) => {
-    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '');
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '') || !!(e.target && e.target.isContentEditable);
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
     else if ((e.ctrlKey || e.metaKey) && !typing && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
     else if ((e.ctrlKey || e.metaKey) && !typing && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }

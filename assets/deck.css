@@ -326,6 +326,14 @@ body.dragging .drop-hint { display: grid; }
 /* עורך: בחירה וגרירה של רכיבים בשקף חופשי */
 .ed-prev .s-canvas .ci { cursor: move; touch-action: none; }
 .ed-prev .s-canvas .ci:hover { outline: 3px dashed rgba(232, 89, 12, .55); outline-offset: 2px; }
+.ed-prev .s-canvas .cvg { position: absolute; z-index: 20; }
+.ed-prev .s-canvas .cvg-v { top: 0; width: 12px; height: 1080px; cursor: ew-resize; background: linear-gradient(90deg, transparent 4px, #0aa5c0 4px, #0aa5c0 8px, transparent 8px); }
+.ed-prev .s-canvas .cvg-h { left: 0; height: 12px; width: 1920px; cursor: ns-resize; background: linear-gradient(transparent 4px, #0aa5c0 4px, #0aa5c0 8px, transparent 8px); }
+.ed-prev .s-canvas .cvs { position: absolute; z-index: 21; background: #e0218a; pointer-events: none; }
+.ed-prev .s-canvas .cvs-v { top: 0; width: 4px; height: 1080px; }
+.ed-prev .s-canvas .cvs-h { left: 0; height: 4px; width: 1920px; }
+.ed-prev .s-canvas .ci.editing { cursor: text; background: rgba(255, 244, 200, .55); outline: 4px solid #e8590c; user-select: text; -webkit-user-select: text; }
+.cvsnap { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
 .ed-prev .s-canvas .ci.sel { outline: 4px solid #e8590c; outline-offset: 2px; }
 .ed-prev .s-canvas .ci .hd { position: absolute; width: 34px; height: 34px; background: #fff; border: 5px solid #e8590c; border-radius: 6px; z-index: 5; }
 .ed-prev .s-canvas .hd-nw { left: -17px; top: -17px; cursor: nwse-resize; }
