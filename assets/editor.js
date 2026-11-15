@@ -229,6 +229,7 @@
       n.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         if (n.isContentEditable) { e.stopPropagation(); return; }
+        const ae = document.activeElement; if (ae && ae !== document.body && ae.blur) ae.blur(); // שהמקשים (Ctrl+Z) יפעלו על המצגת
         e.preventDefault(); e.stopPropagation();
         selectItem(i);
         const cur = stage.querySelector('.cv [data-i="' + i + '"]');
@@ -710,7 +711,7 @@
     const body = h('div', { class: 'ed-fields' });
     if (s.type === 'canvas') renderCanvasForm(s, body);
     else buildFields((TYPES[s.type] || TYPES.text).fields, s, body, s);
-    body.append(wrapField({ label: 'הערות מרצה (לא מוצגות לכיתה)' }, h('textarea', { rows: 5, oninput: (e) => { s.notes = e.target.value; changed(); } }, s.notes || '')));
+    body.append(wrapField({ label: 'תוכן השקופית (טקסט נלווה, לשיתוף עם הסטודנטים)' }, h('textarea', { rows: 5, oninput: (e) => { s.notes = e.target.value; changed(); } }, s.notes || '')));
     formBox.append(body);
   }
 
@@ -719,15 +720,16 @@
   /* ---------- מקשים ---------- */
   document.addEventListener('keydown', (e) => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '') || !!(e.target && e.target.isContentEditable);
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
-    else if ((e.ctrlKey || e.metaKey) && !typing && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
-    else if ((e.ctrlKey || e.metaKey) && !typing && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+    const kc = (c, ch) => e.code === 'Key' + c || e.key.toLowerCase() === ch; // גם במקלדת עברית
+    if ((e.ctrlKey || e.metaKey) && kc('S', 's')) { e.preventDefault(); save(); }
+    else if ((e.ctrlKey || e.metaKey) && !typing && kc('Z', 'z')) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+    else if ((e.ctrlKey || e.metaKey) && !typing && kc('Y', 'y')) { e.preventDefault(); redo(); }
     else if (!typing && deck && deck.slides[sel] && deck.slides[sel].type === 'canvas' && deck.slides[sel].items[selItem]) {
       const it = deck.slides[sel].items[selItem], step = e.shiftKey ? 20 : 4;
       const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
       if (mv) { e.preventDefault(); it.x = (it.x || 0) + mv[0]; it.y = (it.y || 0) + mv[1]; changed(); renderPreview(); renderForm(); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delItem(); }
-      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); dupItem(); }
+      else if ((e.ctrlKey || e.metaKey) && kc('D', 'd')) { e.preventDefault(); dupItem(); }
     }
   });
 

@@ -139,7 +139,7 @@
     const cnt = h('span', { class: 'cnt' });
     const notesBody = h('div');
     const notes = h('div', { class: 'notes' },
-      h('h4', {}, 'הערות מרצה', h('button', { class: 'x', onclick: () => notes.classList.remove('on') }, 'סגור ✕')),
+      h('h4', {}, 'תוכן השקופית', h('button', { class: 'x', onclick: () => notes.classList.remove('on') }, 'סגור ✕')),
       notesBody);
     const ovGrid = h('div', { class: 'g' });
     const ov = h('div', { class: 'ov', onclick: (e) => e.target === ov && toggleOv(false) }, h('h3', {}, deck.title), ovGrid);
@@ -148,7 +148,7 @@
       cnt,
       h('button', { onclick: () => next(), title: 'הבא' }, '←'),
       h('button', { onclick: () => toggleOv(), title: 'תוכן (O)' }, 'תוכן'),
-      h('button', { onclick: () => notes.classList.toggle('on'), title: 'הערות (N)' }, 'הערות'),
+      h('button', { onclick: () => notes.classList.toggle('on'), title: 'תוכן השקופית (N)' }, 'תוכן'),
       h('button', { onclick: () => fullscreen(), title: 'מסך מלא (F)' }, 'מסך מלא'),
       h('a', { href: 'index.html' }, 'כל המצגות'));
     document.body.append(view, progress, ctrl, notes, ov);
