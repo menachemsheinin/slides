@@ -10,7 +10,21 @@
   let deck, savedJSON, sel = 0, serverOk = false;
   let hist = [], hi = 0, snapT = null, prevT = null;
   let selItem = -1, lastSel = -1; // רכיב נבחר בשקף חופשי
+  let selSet = new Set(); // בחירה מרובה (Shift או מסגרת). בתוקף רק כשיש בה יותר מרכיב אחד והרכיב הראשי (selItem) בתוכה
   const clone = (o) => JSON.parse(JSON.stringify(o));
+  function setSel(list, primary) { selSet = new Set(list); selItem = list.length ? (primary != null ? primary : list[list.length - 1]) : -1; }
+  function multiList() {
+    const s = deck && deck.slides[sel];
+    if (!s || s.type !== 'canvas' || selSet.size < 2 || !selSet.has(selItem)) return null;
+    const l = [...selSet].filter((i) => s.items && s.items[i]).sort((a, b) => a - b);
+    return l.length > 1 ? l : null;
+  }
+  function toggleSel(i) {
+    const cur = multiList() || (selItem >= 0 ? [selItem] : []);
+    const at = cur.indexOf(i);
+    if (at >= 0) cur.splice(at, 1); else cur.push(i);
+    setSel(cur, at >= 0 ? cur[cur.length - 1] : i);
+  }
   const api = (path, opts) => fetch(path, { cache: 'no-store', ...opts, headers: { 'X-Deck-Edit': '1', ...((opts || {}).headers || {}) } });
 
   /* ---------- שלד העמוד ---------- */
@@ -70,7 +84,7 @@
     clearTimeout(prevT); prevT = setTimeout(() => { renderPreview(); renderList(); }, 120);
   }
   function structural() { snap(); renderAll(); }
-  function restore(i) { hi = i; deck = JSON.parse(hist[hi]); sel = Math.min(sel, deck.slides.length - 1); titleInput.value = deck.title; renderAll(); }
+  function restore(i) { hi = i; selSet = new Set(); deck = JSON.parse(hist[hi]); sel = Math.min(sel, deck.slides.length - 1); titleInput.value = deck.title; renderAll(); }
   function undo() { snap(); if (hi > 0) restore(hi - 1); }
   function redo() { if (hi < hist.length - 1) restore(hi + 1); }
 
@@ -122,6 +136,7 @@
     const keys = TYPES[newType].fields.map((f) => f.k);
     keys.forEach((k) => { if (old[k] !== undefined && typeof old[k] === typeof next[k]) next[k] = old[k]; });
     next.notes = old.notes || '';
+    if (old.notesHtml) next.notesHtml = old.notesHtml;
     deck.slides[sel] = next; structural();
   }
 
@@ -139,7 +154,7 @@
     return h('div', { class: 'th' }, st);
   }
   function thumbFor(s) {
-    const key = JSON.stringify({ ...s, notes: undefined });
+    const key = JSON.stringify({ ...s, notes: undefined, notesHtml: undefined });
     let tpl = thumbCache.get(key);
     if (!tpl) {
       tpl = buildThumb(s);
@@ -218,8 +233,8 @@
 
   /* ---------- שקף חופשי: בחירה, גרירה ושינוי גודל על התצוגה המקדימה ---------- */
   function selectItem(i) {
-    if (selItem === i) return;
-    selItem = i; renderPreview(); renderForm();
+    if (selItem === i && !multiList()) return;
+    setSel([i]); renderPreview(); renderForm();
   }
   function wireCanvas(el, s) {
     const cv = el.querySelector('.cv');
@@ -231,18 +246,56 @@
         if (n.isContentEditable) { e.stopPropagation(); return; }
         const ae = document.activeElement; if (ae && ae !== document.body && ae.blur) ae.blur(); // שהמקשים (Ctrl+Z) יפעלו על המצגת
         e.preventDefault(); e.stopPropagation();
+        if (e.shiftKey || e.ctrlKey || e.metaKey) { toggleSel(i); renderPreview(); renderForm(); return; } // הוספה/הסרה מהבחירה
+        const ml = multiList();
+        if (ml && ml.includes(i)) { startGroupDrag(e, s, ml, i); return; } // גרירת כל הנבחרים יחד
         selectItem(i);
         const cur = stage.querySelector('.cv [data-i="' + i + '"]');
         if (cur) startDrag(e, s, i, cur, 'move');
       });
     });
-    cv.addEventListener('pointerdown', (e) => { if (e.target === cv && selItem !== -1) { selItem = -1; renderPreview(); renderForm(); } });
+    /* חלונית בחירה: גרירה על רקע השקף. Shift מוסיף לבחירה הקיימת. לחיצה בלבד מבטלת בחירה */
+    cv.addEventListener('pointerdown', (e) => {
+      if (e.target !== cv || e.button !== 0) return;
+      const ae = document.activeElement; if (ae && ae !== document.body && ae.blur) ae.blur();
+      e.preventDefault();
+      const add = e.shiftKey || e.ctrlKey || e.metaKey;
+      const r = cv.getBoundingClientRect(), k = r.width / 1920 || 1;
+      const x0 = (e.clientX - r.left) / k, y0 = (e.clientY - r.top) / k;
+      const base = add ? (multiList() || (selItem >= 0 ? [selItem] : [])) : [];
+      const box = h('div', { class: 'cvm' });
+      cv.append(box);
+      let moved = false;
+      const rectOf = (ev) => {
+        const x1 = (ev.clientX - r.left) / k, y1 = (ev.clientY - r.top) / k;
+        return { l: Math.min(x0, x1), t: Math.min(y0, y1), r: Math.max(x0, x1), b: Math.max(y0, y1) };
+      };
+      const hit = (q) => [...cv.querySelectorAll('.ci')].filter((el) => {
+        const l = el.offsetLeft, t = el.offsetTop;
+        return l < q.r && l + el.offsetWidth > q.l && t < q.b && t + el.offsetHeight > q.t;
+      }).map((el) => +el.dataset.i);
+      const mv = (ev) => {
+        const q = rectOf(ev);
+        if (!moved && (q.r - q.l) * k < 4 && (q.b - q.t) * k < 4) return;
+        moved = true;
+        Object.assign(box.style, { left: q.l + 'px', top: q.t + 'px', width: q.r - q.l + 'px', height: q.b - q.t + 'px' });
+        const hs = hit(q);
+        cv.querySelectorAll('.ci').forEach((el) => el.classList.toggle('mhit', hs.includes(+el.dataset.i)));
+      };
+      const up = (ev) => {
+        removeEventListener('pointermove', mv); removeEventListener('pointerup', up);
+        if (!moved) { box.remove(); if (!add && selItem !== -1) { setSel([]); renderPreview(); renderForm(); } return; }
+        const all = [...new Set([...base, ...hit(rectOf(ev))])].sort((a, b) => a - b);
+        setSel(all); renderPreview(); renderForm();
+      };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up);
+    });
     cv.addEventListener('dblclick', (e) => {
       const t = e.target.closest && e.target.closest('.ci');
       if (!t) return;
       const i = +t.dataset.i, itm = s.items[i];
       if (!itm || (itm.kind || 'text') !== 'text') return;
-      if (selItem !== i) { selItem = i; renderPreview(); renderForm(); }
+      if (selItem !== i || multiList()) { setSel([i]); renderPreview(); renderForm(); }
       editInline(s, i);
     });
     /* קווי עזר */
@@ -265,29 +318,82 @@
       });
       cv.append(gn);
     });
-    const it = s.items[selItem];
+    const ml = multiList();
+    if (ml) {
+      // בחירה מרובה: כל הנבחרים מסומנים, ומסגרת מקווקווה מקיפה את הקבוצה
+      let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+      ml.forEach((i) => {
+        const el = cv.querySelector('[data-i="' + i + '"]');
+        if (!el) return;
+        el.classList.add('sel', 'msel');
+        L = Math.min(L, el.offsetLeft); T = Math.min(T, el.offsetTop);
+        R = Math.max(R, el.offsetLeft + el.offsetWidth); B = Math.max(B, el.offsetTop + el.offsetHeight);
+      });
+      if (L < Infinity) cv.append(h('div', { class: 'cvgb', style: { left: L - 8 + 'px', top: T - 8 + 'px', width: R - L + 16 + 'px', height: B - T + 16 + 'px' } }));
+    }
+    const it = !ml && s.items[selItem];
     const n = it && cv.querySelector('[data-i="' + selItem + '"]');
     if (n) {
       n.classList.add('sel');
       ['nw', 'ne', 'sw', 'se'].forEach((pos) => n.append(h('i', { class: 'hd hd-' + pos, onpointerdown: (e) => { e.preventDefault(); e.stopPropagation(); startDrag(e, s, selItem, n, pos); } })));
     }
   }
+  /* ---------- סרגל עיצוב טקסט עשיר (משותף לתיבות בשקף ולשדה תוכן השקופית) ---------- */
+  // הלחיצות על הכפתורים לא גונבות את המיקוד, כדי שהסימון בטקסט יישמר
+  function richBar(n, onInput, cls) {
+    const cmd = (c, v) => { n.focus(); document.execCommand('styleWithCSS', false, true); document.execCommand(c, false, v); onInput(); };
+    const SW = ['#0A0A0A', '#C00000', '#E8590C', '#B8860B', '#2B8A3E', '#1C7ED6', '#7048E8', '#6A645A'];
+    const btn = (label, title, fn, extra) => h('button', { type: 'button', title, class: extra || '', onmousedown: (e) => { e.preventDefault(); fn(); } }, label);
+    return h('div', { class: 'rtbar' + (cls ? ' ' + cls : '') },
+      btn('B', 'הדגשה (Ctrl+B)', () => cmd('bold'), 'rt-b'),
+      btn('U', 'קו תחתון (Ctrl+U)', () => cmd('underline'), 'rt-u'),
+      btn('I', 'נטוי (Ctrl+I)', () => cmd('italic'), 'rt-i'),
+      h('span', { class: 'rt-sep' }),
+      ...SW.map((c) => h('button', { type: 'button', class: 'rt-sw', title: 'צבע טקסט', style: { background: c }, onmousedown: (e) => { e.preventDefault(); cmd('foreColor', c); } })),
+      h('span', { class: 'rt-sep' }),
+      btn('1.', 'מספור', () => cmd('insertOrderedList')),
+      btn('•', 'תבליטים', () => cmd('insertUnorderedList')),
+      h('span', { class: 'rt-sep' }),
+      btn('נקה', 'ניקוי עיצוב מהטקסט המסומן', () => cmd('removeFormat')));
+  }
+  // הדבקה כטקסט פשוט, כדי שעיצוב חיצוני לא ייכנס
+  function plainPaste(n) {
+    n.addEventListener('paste', (e) => {
+      e.preventDefault();
+      document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
+    });
+  }
+
   /* ---------- עריכת טקסט בתוך התיבה ---------- */
   function editInline(s, i) {
     const n = stage.querySelector('.cv [data-i="' + i + '"]'), it = s.items[i];
     if (!n || n.isContentEditable) return;
+    const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const plainToHtml = (t) => String(t || '').split('\n').map(esc).join('<br>');
+    let start;
+    if (it.html) start = window.Slides.sanitizeRich(it.html);
+    else if (it.list) start = '<' + (it.list === 'number' ? 'ol' : 'ul') + '>' + String(it.text || '').split('\n').map((l) => '<li>' + esc(l) + '</li>').join('') + '</' + (it.list === 'number' ? 'ol' : 'ul') + '>';
+    else start = plainToHtml(it.text);
     n.classList.add('editing');
-    n.textContent = it.text || '';
+    n.innerHTML = start;
     n.style.whiteSpace = 'pre-wrap';
-    n.setAttribute('contenteditable', 'plaintext-only');
-    if (!n.isContentEditable) n.setAttribute('contenteditable', 'true');
+    n.setAttribute('contenteditable', 'true');
     n.focus();
     const r = document.createRange(); r.selectNodeContents(n);
     const sel_ = getSelection(); sel_.removeAllRanges(); sel_.addRange(r);
     const read = () => String(n.innerText || '').replace(/\r/g, '').replace(/\n$/, '');
-    n.addEventListener('input', () => { it.text = read(); updateStatus(); clearTimeout(snapT); snapT = setTimeout(snap, 600); renderForm(); });
+    const store = () => {
+      it.text = read();
+      const html = window.Slides.sanitizeRich(n.innerHTML);
+      if (/<(b|i|u|span|ol|ul)[\s>]/.test(html)) { it.html = html; it.list = ''; } else delete it.html;
+    };
+    const bar = richBar(n, () => input());
+    plainPaste(n);
+    prevBox.append(bar);
+    function input() { store(); updateStatus(); clearTimeout(snapT); snapT = setTimeout(snap, 600); }
+    n.addEventListener('input', () => { input(); renderForm(); });
     n.addEventListener('keydown', (ev) => { ev.stopPropagation(); if (ev.key === 'Escape') n.blur(); });
-    n.addEventListener('blur', () => { it.text = read(); changed(); snap(); renderPreview(); renderForm(); }, { once: true });
+    n.addEventListener('blur', () => { bar.remove(); store(); changed(); snap(); renderPreview(); renderForm(); }, { once: true });
   }
 
   /* ---------- הצמדה לקווי עזר ולאלמנטים ---------- */
@@ -360,10 +466,36 @@
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
   }
+  /* גרירת קבוצת רכיבים נבחרים. לחיצה בלי תנועה משאירה רק את הרכיב שנלחץ */
+  function startGroupDrag(e, s, list, pi) {
+    const cv = stage.querySelector('.cv');
+    const k = cv.getBoundingClientRect().width / 1920 || 1;
+    const sx = e.clientX, sy = e.clientY;
+    const o = list.map((i) => ({ i, x: s.items[i].x || 0, y: s.items[i].y || 0 }));
+    let moved = false;
+    const mv = (ev) => {
+      const dx = Math.round((ev.clientX - sx) / k), dy = Math.round((ev.clientY - sy) / k);
+      if (!dx && !dy && !moved) return;
+      if (!moved) { moved = true; cv.querySelectorAll('.cvgb').forEach((x) => x.remove()); }
+      o.forEach((p) => {
+        const it = s.items[p.i];
+        it.x = p.x + dx; it.y = p.y + dy;
+        const el = cv.querySelector('[data-i="' + p.i + '"]');
+        if (el) { el.style.left = it.x + 'px'; el.style.top = it.y + 'px'; }
+      });
+      updateStatus();
+    };
+    const up = () => {
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up);
+      if (moved) { changed(); snap(); renderPreview(); renderForm(); }
+      else { setSel([pi]); renderPreview(); renderForm(); }
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up);
+  }
   const ITEM_POS = [{ k: 'x', t: 'num', label: 'x' }, { k: 'y', t: 'num', label: 'y' }, { k: 'w', t: 'num', label: 'רוחב' }, { k: 'h', t: 'num', label: 'גובה' }];
   const ITEM_FIELDS = {
     text: [
-      { k: 'text', t: 'long', rows: 4, label: 'טקסט (כל שורה בשורה נפרדת)' },
+      { k: 'text', t: 'long', rows: 4, label: 'טקסט (כל שורה בשורה נפרדת; עריכה כאן מאפסת עיצוב מקומי. לעיצוב: לחיצה כפולה על הטקסט בשקף)' },
       { k: 'size', t: 'num', label: 'גודל' },
       { k: 'color', t: 'color', label: 'צבע' },
       { k: 'bold', t: 'select', label: 'עובי', opts: [['', 'רגיל'], ['1', 'מודגש']] },
@@ -408,12 +540,12 @@
       image: { kind: 'image', src: '', alt: '', fit: 'contain', bg: '', x: 560, y: 240, w: 800, h: 600 },
       shape: { kind: 'shape', shape: 'arrow', fill: '#C00000', stroke: '', sw: 0, flip: 'h', rot: 0, x: 800, y: 480, w: 200, h: 100 },
       table: { kind: 'table', rows: 'כותרת א | כותרת ב\nתא | תא\nתא | תא', colw: '50,50', header: 'yes', size: 36, color: '#0A0A0A', x: 240, y: 300, w: 1440, h: 300 } }[kind];
-    s.items.push(clone(base)); selItem = s.items.length - 1; structural();
+    s.items.push(clone(base)); setSel([s.items.length - 1]); structural();
   }
   const mvItem = (d) => {
     const a = deck.slides[sel].items, j = selItem + d;
     if (j < 0 || j >= a.length) return;
-    [a[selItem], a[j]] = [a[j], a[selItem]]; selItem = j; structural();
+    [a[selItem], a[j]] = [a[j], a[selItem]]; setSel([j]); structural();
   };
   function renderCanvasForm(s, body) {
     s.items = s.items || [];
@@ -431,7 +563,9 @@
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('table') }, '+ טבלה'),
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('shape') }, '+ חץ')),
       h('div', { class: 'cvlist' }, s.items.map((it, i) =>
-        h('button', { type: 'button', class: 'cvb' + (i === selItem ? ' on' : ''), onclick: () => { selItem = i; renderPreview(); renderForm(); } }, itemName(it)))));
+        h('button', { type: 'button', class: 'cvb' + ((multiList() ? multiList().includes(i) : i === selItem) ? ' on' : ''), title: 'Shift + לחיצה: הוספה לבחירה', onclick: (e) => { if (e.shiftKey || e.ctrlKey || e.metaKey) toggleSel(i); else setSel([i]); renderPreview(); renderForm(); } }, itemName(it)))));
+    const mlist = multiList();
+    if (mlist) { renderGroupForm(s, body, mlist); return; }
     const it = s.items[selItem];
     if (!it) { body.append(h('p', { class: 'ed-hint' }, 'לחצו על רכיב בתצוגה המקדימה כדי לערוך אותו: גרירה מזיזה, פינות משנות גודל, חיצים מזיזים בעדינות, Delete מוחק.')); return; }
     body.append(
@@ -453,15 +587,97 @@
     (s.guides = s.guides || []).push({ o, p: o === 'v' ? 960 : 540 });
     structural();
   }
+  const selIdx = (s) => multiList() || (s.items[selItem] ? [selItem] : []);
   function dupItem() {
-    const s = deck.slides[sel], it = clone(s.items[selItem]);
-    it.x = (it.x || 0) + 40; it.y = (it.y || 0) + 40;
-    s.items.push(it); selItem = s.items.length - 1; structural();
+    const s = deck.slides[sel], list = selIdx(s), fresh = [];
+    if (!list.length) return;
+    list.forEach((i) => {
+      const it = clone(s.items[i]);
+      it.x = (it.x || 0) + 40; it.y = (it.y || 0) + 40;
+      s.items.push(it); fresh.push(s.items.length - 1);
+    });
+    setSel(fresh); structural();
   }
   function delItem() {
-    const s = deck.slides[sel];
-    if (!s.items[selItem]) return;
-    s.items.splice(selItem, 1); selItem = -1; structural();
+    const s = deck.slides[sel], list = selIdx(s);
+    if (!list.length) return;
+    list.slice().sort((a, b) => b - a).forEach((i) => s.items.splice(i, 1));
+    setSel([]); structural();
+  }
+  /* סדר שכבות לקבוצה: לחזית או לאחור, ושמירת הסדר היחסי */
+  function groupOrder(front) {
+    const s = deck.slides[sel], ml = multiList();
+    if (!ml) return;
+    const pick = new Set(ml), picked = ml.map((i) => s.items[i]), rest = s.items.filter((_, i) => !pick.has(i));
+    s.items = front ? rest.concat(picked) : picked.concat(rest);
+    const base = front ? rest.length : 0;
+    setSel(picked.map((_, j) => base + j)); structural();
+  }
+  /* יישור ופיזור של הנבחרים */
+  function groupGeom(s, ml) {
+    return ml.map((i) => {
+      const it = s.items[i], el = stage.querySelector('.cv [data-i="' + i + '"]');
+      return { it, x: it.x || 0, y: it.y || 0, w: it.w || (el ? el.offsetWidth : 100), h: it.h || (el ? el.offsetHeight : 100) };
+    });
+  }
+  function groupAlign(mode) {
+    const s = deck.slides[sel], ml = multiList();
+    if (!ml) return;
+    const g = groupGeom(s, ml);
+    const L = Math.min(...g.map((p) => p.x)), T = Math.min(...g.map((p) => p.y));
+    const R = Math.max(...g.map((p) => p.x + p.w)), B = Math.max(...g.map((p) => p.y + p.h));
+    g.forEach((p) => {
+      if (mode === 'l') p.it.x = L;
+      else if (mode === 'r') p.it.x = R - p.w;
+      else if (mode === 'cx') p.it.x = Math.round((L + R) / 2 - p.w / 2);
+      else if (mode === 't') p.it.y = T;
+      else if (mode === 'b') p.it.y = B - p.h;
+      else if (mode === 'cy') p.it.y = Math.round((T + B) / 2 - p.h / 2);
+    });
+    changed(); snap(); renderPreview(); renderForm();
+  }
+  function groupDistribute(axis) {
+    const s = deck.slides[sel], ml = multiList();
+    if (!ml || ml.length < 3) return;
+    const g = groupGeom(s, ml).sort((a, b) => (axis === 'x' ? a.x - b.x : a.y - b.y));
+    const pos = axis === 'x' ? 'x' : 'y', len = axis === 'x' ? 'w' : 'h';
+    const first = g[0], last = g[g.length - 1];
+    const span = last[pos] + last[len] - first[pos];
+    const gap = (span - g.reduce((t, p) => t + p[len], 0)) / (g.length - 1);
+    let cur = first[pos];
+    g.forEach((p) => { p.it[pos] = Math.round(cur); cur += p[len] + gap; });
+    changed(); snap(); renderPreview(); renderForm();
+  }
+  /* טופס לבחירה מרובה */
+  function renderGroupForm(s, body, ml) {
+    const bt = (label, title, fn) => h('button', { type: 'button', title, onclick: fn }, label);
+    body.append(
+      h('p', { class: 'ed-hint' }, 'נבחרו ' + ml.length + ' רכיבים. Shift + לחיצה מוסיף או מסיר רכיב, גרירה על הרקע בוחרת בחלונית, Ctrl+A בוחר הכול. גרירה מזיזה את כולם.'),
+      h('div', { class: 'cvbar' },
+        bt('▲ לחזית', 'כל הנבחרים לחזית', () => groupOrder(true)),
+        bt('▼ לאחור', 'כל הנבחרים אחורה', () => groupOrder(false)),
+        bt('שכפל', 'Ctrl+D', dupItem),
+        bt('מחק', 'Delete', delItem)),
+      h('span', { class: 'lbl' }, 'יישור'),
+      h('div', { class: 'cvbar' },
+        bt('⇤ שמאל', 'יישור לקצה השמאלי', () => groupAlign('l')),
+        bt('⇔ מרכז', 'מרכז אופקי', () => groupAlign('cx')),
+        bt('⇥ ימין', 'יישור לקצה הימני', () => groupAlign('r'))),
+      h('div', { class: 'cvbar' },
+        bt('⤒ למעלה', 'יישור לקצה העליון', () => groupAlign('t')),
+        bt('⇕ אמצע', 'מרכז אנכי', () => groupAlign('cy')),
+        bt('⤓ למטה', 'יישור לקצה התחתון', () => groupAlign('b'))),
+      ml.length >= 3 ? h('div', { class: 'cvbar' },
+        bt('פזר אופקית', 'מרווחים שווים בין הרכיבים', () => groupDistribute('x')),
+        bt('פזר אנכית', 'מרווחים שווים בין הרכיבים', () => groupDistribute('y'))) : null);
+    const texts = ml.map((i) => s.items[i]).filter((it) => (it.kind || 'text') === 'text');
+    if (texts.length) {
+      // מאפייני טקסט משותפים: כל שינוי חל על כל רכיבי הטקסט שנבחרו
+      const proxy = new Proxy({}, { get: (_, k) => texts[0][k], set: (_, k, v) => { texts.forEach((t) => { t[k] = v; }); return true; } });
+      const box = h('div', { class: 'ed-fields' });
+      buildFields(ITEM_FIELDS.text.filter((f) => ['size', 'color', 'bold', 'align', 'font'].includes(f.k)), proxy, box, proxy);
+      body.append(h('span', { class: 'lbl' }, 'עיצוב טקסט משותף (' + texts.length + ' תיבות)'), box);
+    }
   }
   function fit() {
     const r = prevBox.getBoundingClientRect();
@@ -678,7 +894,7 @@
       if (f.t === 'text') {
         el = wrapField(f, h('input', { type: 'text', value: obj[f.k] == null ? '' : obj[f.k], oninput: (e) => { obj[f.k] = e.target.value; if (onLabel && f.k === labelKey) onLabel(e.target.value); changed(); } }));
       } else if (f.t === 'long') {
-        el = wrapField(f, h('textarea', { rows: f.rows || 4, oninput: (e) => { obj[f.k] = e.target.value; changed(); } }, obj[f.k] == null ? '' : obj[f.k]));
+        el = wrapField(f, h('textarea', { rows: f.rows || 4, oninput: (e) => { obj[f.k] = e.target.value; if (f.k === 'text' && obj.html) delete obj.html; /* עריכת טקסט פשוט מאפסת עיצוב עשיר */ changed(); } }, obj[f.k] == null ? '' : obj[f.k]));
       } else if (f.t === 'num') {
         el = wrapField(f, h('input', { type: 'number', value: obj[f.k] == null ? 0 : obj[f.k], oninput: (e) => { obj[f.k] = e.target.value === '' ? 0 : Number(e.target.value); changed(); } }));
       } else if (f.t === 'select') {
@@ -711,11 +927,41 @@
     const body = h('div', { class: 'ed-fields' });
     if (s.type === 'canvas') renderCanvasForm(s, body);
     else buildFields((TYPES[s.type] || TYPES.text).fields, s, body, s);
-    body.append(wrapField({ label: 'תוכן השקופית (טקסט נלווה, לשיתוף עם הסטודנטים)' }, h('textarea', { rows: 5, oninput: (e) => { s.notes = e.target.value; changed(); } }, s.notes || '')));
+    const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const ne = h('div', { class: 'notes-ed', contenteditable: 'true', dir: 'auto' });
+    ne.innerHTML = s.notesHtml ? window.Slides.sanitizeRich(s.notesHtml) : String(s.notes || '').split('\n').map(esc).join('<br>');
+    const notesStore = () => {
+      s.notes = String(ne.innerText || '').replace(/\r/g, '').replace(/\n$/, '');
+      const html = window.Slides.sanitizeRich(ne.innerHTML);
+      if (/<(b|i|u|span|ol|ul)[\s>]/.test(html)) s.notesHtml = html; else delete s.notesHtml;
+      changed();
+    };
+    // סרגל עיצוב צף: מופיע מעל הטקסט המסומן ונעלם כשאין בחירה
+    let fbar;
+    const place = () => {
+      const sl = getSelection();
+      if (!sl.rangeCount || sl.isCollapsed || !ne.contains(sl.anchorNode) || !ne.contains(sl.focusNode)) { fbar.classList.remove('on'); return; }
+      const r = sl.getRangeAt(0).getBoundingClientRect();
+      fbar.classList.add('on');
+      const w = fbar.offsetWidth, hh = fbar.offsetHeight;
+      fbar.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px';
+      fbar.style.top = (r.top - hh - 8 < 8 ? r.bottom + 8 : r.top - hh - 8) + 'px';
+    };
+    const notesInput = () => { notesStore(); place(); };
+    fbar = richBar(ne, notesInput, 'floating');
+    ne.addEventListener('input', notesStore);
+    ne.addEventListener('pointerup', () => setTimeout(place, 0));
+    ne.addEventListener('keyup', place);
+    ne.addEventListener('blur', () => fbar.classList.remove('on'));
+    ne.addEventListener('scroll', () => fbar.classList.remove('on'));
+    plainPaste(ne);
+    const nf = wrapField({ label: 'תוכן השקופית (טקסט נלווה, לשיתוף עם הסטודנטים). סמנו טקסט כדי לעצב אותו' }, h('div', { class: 'notes-wrap' }, fbar, ne));
+    nf.classList.add('notes-fld'); // תופס את כל הגובה הפנוי בטופס
+    body.append(nf);
     formBox.append(body);
   }
 
-  function renderAll() { if (sel !== lastSel) { selItem = -1; lastSel = sel; } renderList(); renderForm(); renderPreview(); fit(); updateStatus(); history.replaceState(null, '', '#' + (sel + 1)); }
+  function renderAll() { if (sel !== lastSel) { setSel([]); lastSel = sel; } renderList(); renderForm(); renderPreview(); fit(); updateStatus(); history.replaceState(null, '', '#' + (sel + 1)); }
 
   /* ---------- מקשים ---------- */
   document.addEventListener('keydown', (e) => {
@@ -724,10 +970,18 @@
     if ((e.ctrlKey || e.metaKey) && kc('S', 's')) { e.preventDefault(); save(); }
     else if ((e.ctrlKey || e.metaKey) && !typing && kc('Z', 'z')) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if ((e.ctrlKey || e.metaKey) && !typing && kc('Y', 'y')) { e.preventDefault(); redo(); }
-    else if (!typing && deck && deck.slides[sel] && deck.slides[sel].type === 'canvas' && deck.slides[sel].items[selItem]) {
-      const it = deck.slides[sel].items[selItem], step = e.shiftKey ? 20 : 4;
+    else if (!typing && deck && deck.slides[sel] && deck.slides[sel].type === 'canvas' && (e.ctrlKey || e.metaKey) && kc('A', 'a')) {
+      e.preventDefault(); // בחירת כל הרכיבים בשקף
+      const all = (deck.slides[sel].items || []).map((_, i) => i);
+      setSel(all); renderPreview(); renderForm();
+    }
+    else if (!typing && deck && deck.slides[sel] && deck.slides[sel].type === 'canvas' && e.key === 'Escape' && selItem !== -1) {
+      setSel([]); renderPreview(); renderForm();
+    }
+    else if (!typing && deck && deck.slides[sel] && deck.slides[sel].type === 'canvas' && (deck.slides[sel].items[selItem] || multiList())) {
+      const s_ = deck.slides[sel], list = selIdx(s_), step = e.shiftKey ? 20 : 4;
       const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-      if (mv) { e.preventDefault(); it.x = (it.x || 0) + mv[0]; it.y = (it.y || 0) + mv[1]; changed(); renderPreview(); renderForm(); }
+      if (mv) { e.preventDefault(); list.forEach((i) => { const it = s_.items[i]; it.x = (it.x || 0) + mv[0]; it.y = (it.y || 0) + mv[1]; }); changed(); renderPreview(); renderForm(); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delItem(); }
       else if ((e.ctrlKey || e.metaKey) && kc('D', 'd')) { e.preventDefault(); dupItem(); }
     }

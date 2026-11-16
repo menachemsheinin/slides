@@ -195,6 +195,122 @@ body.player { overflow: hidden; background: #0d0c0b; }
 .ov button { font: inherit; text-align: right; color: inherit; background: rgba(255, 255, 255, .07); border: 2px solid transparent; border-radius: 6px; padding: 10px 14px; cursor: pointer; display: flex; gap: 12px; align-items: baseline; font-size: 18px; }
 .ov button:hover, .ov button.cur { border-color: var(--c-app); }
 .ov button b { font-size: 22px; color: #f0a37d; min-width: 28px; }
+.ov .g { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.ov button { flex-direction: column; align-items: stretch; gap: 8px; padding: 8px; }
+.ov .th2 { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 3px; background: var(--bg); pointer-events: none; }
+.ov .th2 .stage { left: 0; top: 0; transform-origin: 0 0; }
+.ov .th2 .slide.on { animation: none; }
+.ov .th2 .step { transition: none; }
+.ov .cap { display: flex; gap: 10px; align-items: baseline; font-size: 16px; min-width: 0; }
+/* שקף מתגים אינטראקטיביים */
+.s-switches .grow { align-items: center; justify-content: flex-start; margin-top: 6px; }
+.sw-row { direction: ltr; display: flex; justify-content: center; gap: 10px; }
+.sw-col { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 118px; }
+.sw-w { font-size: 34px; font-weight: 800; color: #6A645A; line-height: 1; }
+.sw-btn { position: relative; width: 104px; height: 58px; border: 0; border-radius: 29px; background: #B9B4A8; cursor: pointer; padding: 0; transition: background .2s; }
+.sw-btn i { position: absolute; top: 6px; left: 6px; width: 46px; height: 46px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); transition: transform .2s; }
+.sw-btn.on { background: #2B8A3E; box-shadow: 0 0 0 6px rgba(126, 224, 143, .4); }
+.sw-btn.on i { transform: translateX(46px); }
+.sw-bit { font-size: 40px; font-weight: 800; color: #8A857A; line-height: 1; }
+.sw-bit.on { color: #2B8A3E; }
+.sw-res { direction: ltr; display: flex; align-items: center; justify-content: center; gap: 70px; margin-top: 10px; }
+.sw-calc { text-align: center; }
+.sw-val { font-size: 88px; font-weight: 800; color: var(--c-app); line-height: 1; }
+.sw-sum { font-size: 32px; color: #6A645A; margin-top: 6px; }
+.sw-ch { width: 120px; height: 120px; border-radius: 18px; background: #F4ECD8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.sw-chr { font-size: 70px; font-weight: 800; line-height: 1; font-family: Arial, sans-serif; }
+.sw-code { font-size: 24px; color: #6A645A; }
+.sw-hint { text-align: center; font-size: 30px; margin: 14px 0 0; color: #6A645A; }
+.sw-reset { align-self: center; margin-inline-start: 20px; font: inherit; font-size: 24px; padding: 6px 28px; border: 2px solid #B9B4A8; background: #fff; border-radius: 999px; cursor: pointer; color: #6A645A; }
+/* שקף מעגל חשמלי */
+.s-circuit .grow { align-items: center; justify-content: flex-start; margin-top: 6px; }
+.s-circuit h2 { margin-bottom: 4px; font-size: 52px; }
+.cir-wrap { display: flex; gap: 30px; justify-content: center; width: 100%; }
+.cir-col { width: 370px; text-align: center; }
+.cir-col h3 { font-size: 36px; margin: 0; }
+.cir-svg svg { width: 100%; height: auto; display: block; overflow: visible; }
+.cir-svg .cw { fill: none; stroke: #9A958A; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; transition: stroke .15s; }
+.cir-svg .cw.on { stroke: #E8590C; }
+.cir-svg .glow { transition: opacity .15s; opacity: 0; }
+.cir-state { font-size: 30px; font-weight: 800; color: #8A857A; }
+.cir-state.lit { color: #C98F00; }
+.cir-rule { font-size: 24px; color: #6A645A; }
+/* שקף קסקדת מתגים */
+.s-cascade .grow { align-items: center; }
+.s-cascade h2 { margin-bottom: 4px; font-size: 52px; }
+.cs-grid { direction: ltr; display: flex; flex-direction: column; gap: 9px; align-items: center; margin-top: 4px; }
+.cs-row { display: flex; gap: 10px; }
+.cs-cell { position: relative; flex: none; width: 48px; height: 26px; border-radius: 13px; background: #D8D3C6; border: 0; padding: 0; display: block; transition: background .15s; }
+.cs-cell::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: transform .15s; }
+.cs-cell.on { background: var(--c, #2B8A3E); }
+.cs-cell.on::after { transform: translateX(22px); }
+.cs-top .cs-cell { cursor: pointer; box-shadow: 0 0 0 3px #1C7ED6; }
+.cs-ctrl { display: flex; gap: 12px; justify-content: center; margin-top: 16px; }
+.cs-mode { font: inherit; font-size: 24px; padding: 6px 22px; border: 2px solid #B9B4A8; background: #fff; border-radius: 999px; cursor: pointer; color: #6A645A; }
+.cs-mode.on { background: #1C7ED6; border-color: #1C7ED6; color: #fff; font-weight: 700; }
+/* שקף שרשרת מתגים (דומינו) */
+.s-chain .grow { align-items: center; }
+.s-chain h2 { margin-bottom: 4px; font-size: 52px; }
+.ch-row { display: flex; align-items: flex-start; justify-content: center; margin-top: 10px; }
+.ch-st { width: 140px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.ch-box { height: 66px; display: flex; align-items: center; justify-content: center; }
+.ch-sw { position: relative; width: 120px; height: 66px; border-radius: 33px; background: #B9B4A8; border: 0; padding: 0; transition: background .25s; }
+.ch-sw::after { content: ''; position: absolute; top: 6px; left: 6px; width: 54px; height: 54px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); transition: transform .25s; }
+.ch-sw.on { background: #2B8A3E; box-shadow: 0 0 0 6px rgba(126, 224, 143, .4); }
+.ch-sw.on::after { transform: translateX(54px); }
+.ch-sw.me { cursor: pointer; outline: 4px solid #1C7ED6; outline-offset: 5px; }
+.ch-sw:disabled { cursor: default; }
+.ch-lamp { width: 96px; height: 96px; border-radius: 50%; background: #E4E0D4; border: 6px solid #333; box-sizing: border-box; display: grid; place-items: center; transition: background .25s, box-shadow .25s; }
+.ch-lamp::before { content: '✕'; font-size: 46px; color: #333; line-height: 1; }
+.ch-lamp.on { background: #FFE066; box-shadow: 0 0 44px 16px rgba(255, 224, 102, .65); }
+.ch-lab { font-size: 30px; font-weight: 700; color: #6A645A; margin-top: 14px; }
+.ch-arrow { width: 56px; height: 66px; display: flex; align-items: center; justify-content: center; }
+.ch-arrow svg { width: 56px; height: 22px; }
+.ch-arrow path { stroke: #B9B4A8; fill: #B9B4A8; transition: stroke .25s, fill .25s; }
+.ch-arrow.on path { stroke: #E8590C; fill: #E8590C; }
+.ch-cap { text-align: center; font-size: 34px; font-weight: 700; margin: 40px 0 0; }
+.cs-grid .cs-cell.pa { box-shadow: 0 0 0 3px #E8590C; }
+.sw-explain { font-size: 29px; line-height: 1.3; margin: 0 0 6px; text-align: right; color: #3d3a34; }
+/* שקף רשת מתגים */
+.s-network .grow { align-items: center; justify-content: flex-start; margin-top: 6px; }
+.s-network h2 { margin-bottom: 4px; font-size: 50px; }
+.nw { position: relative; direction: ltr; margin: 0 auto; }
+.nw-lines { position: absolute; inset: 0; pointer-events: none; }
+.nw-l { fill: none; stroke: #B9B4A8; stroke-width: 5; stroke-linecap: round; transition: stroke .25s; }
+.nw-l.on { stroke: #E8590C; }
+.nw-n { position: absolute; width: 90px; height: 46px; border-radius: 23px; background: #B9B4A8; border: 0; padding: 0; display: block; transition: background .25s; }
+.nw-n::after { content: ''; position: absolute; top: 5px; left: 5px; width: 36px; height: 36px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .25s; }
+.nw-n.on { background: #2B8A3E; box-shadow: 0 0 0 5px rgba(126, 224, 143, .4); }
+.nw-n.on::after { transform: translateX(44px); }
+.nw-n.me { cursor: pointer; outline: 3px solid #1C7ED6; outline-offset: 4px; }
+.nw-lamp { position: absolute; width: 72px; height: 72px; border-radius: 50%; background: #E4E0D4; border: 5px solid #333; box-sizing: border-box; display: grid; place-items: center; transition: background .25s, box-shadow .25s; }
+.nw-lamp::before { content: '✕'; font-size: 36px; color: #333; line-height: 1; }
+.nw-lamp.on { background: #FFE066; box-shadow: 0 0 36px 14px rgba(255, 224, 102, .65); }
+.nw-lab { position: absolute; width: 90px; text-align: center; font-size: 22px; font-weight: 800; color: #1C7ED6; }
+.nw-lab.in { color: #6A645A; }
+.nw-lab.lamp { color: #6A645A; }
+/* שקף שער לוגי */
+.s-gate .grow { align-items: center; justify-content: flex-start; margin-top: 4px; }
+.s-gate h2 { margin-bottom: 4px; font-size: 52px; }
+.gt-row { direction: ltr; display: flex; align-items: center; justify-content: center; gap: 36px; }
+.gt-svg svg { width: 560px; height: auto; display: block; }
+.gt-tbl table { border-collapse: collapse; font-size: 30px; text-align: center; direction: ltr; }
+.gt-tbl th, .gt-tbl td { padding: 2px 20px; border-bottom: 2px solid #D5CEBD; }
+.gt-tbl th { font-size: 28px; color: #6A645A; border-bottom: 3px solid #333; }
+.gt-tbl tr.cur td { background: #FDE6D6; font-weight: 800; }
+.gt-tbl td.o { color: #8A857A; }
+.gt-tbl td.o.one { color: #2B8A3E; font-weight: 800; }
+.gt-rule { font-size: 30px; font-weight: 700; margin: 0; text-align: center; }
+.ed-prev { position: relative; }
+.rtbar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 4px; background: #1d1b18; padding: 5px 8px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); direction: rtl; }
+.rtbar button { font: inherit; font-size: 15px; min-width: 30px; height: 30px; padding: 0 8px; border: 0; border-radius: 5px; background: rgba(255, 255, 255, .12); color: #f6f0e4; cursor: pointer; }
+.rtbar button:hover { background: rgba(255, 255, 255, .28); }
+.rtbar .rt-b { font-weight: 800; }
+.rtbar .rt-u { text-decoration: underline; }
+.rtbar .rt-i { font-style: italic; }
+.rtbar .rt-sw { min-width: 22px; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .6); }
+.rtbar .rt-sep { width: 1px; height: 22px; background: rgba(255, 255, 255, .25); margin: 0 4px; }
+.ov .cap span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- עורך ---------- */
 body.editor { height: 100vh; overflow: hidden; display: flex; flex-direction: column; background: #e8e1d2; font-size: 15px; }
@@ -239,6 +355,15 @@ body.editor { height: 100vh; overflow: hidden; display: flex; flex-direction: co
 .ed-form input[type=text], .ed-form input[type=number], .ed-form textarea, .ed-form select, .ed-add select { font: inherit; width: 100%; padding: 6px 9px; border: 1px solid #c9bfa9; border-radius: 4px; background: #fff; color: var(--text); }
 .ed-form input:focus, .ed-form textarea:focus, .ed-form select:focus { outline: 2px solid var(--c-bg); outline-offset: 0; }
 .ed-form textarea { resize: vertical; line-height: 1.45; }
+.ed-form > .ed-fields { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.ed-form .notes-fld { flex: 1; display: flex; flex-direction: column; min-height: 160px; }
+.ed-form .notes-fld .notes-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.rtbar.floating { position: fixed; transform: none; display: none; z-index: 60; }
+.rtbar.floating.on { display: flex; }
+.notes-ed { flex: 1; min-height: 140px; overflow: auto; padding: 8px 10px; border: 1px solid #c9bfa9; border-radius: 4px; background: #fff; color: var(--text); line-height: 1.45; white-space: pre-wrap; outline: none; }
+.notes-ed:focus { outline: 2px solid var(--c-bg); }
+.notes-ed ol, .notes-ed ul { margin: 0; padding-inline-start: 28px; }
+#notes-rich, .notes ol, .notes ul { margin: 0; padding-inline-start: 32px; }
 button.add { font: inherit; font-size: 13px; background: transparent; border: 1px dashed #9c9380; border-radius: 4px; padding: 4px 12px; cursor: pointer; margin-top: 6px; }
 button.add:hover { background: var(--cc-soft, #ece4d5); }
 .strs .srow { display: flex; gap: 4px; margin-bottom: 4px; }
@@ -335,6 +460,10 @@ body.dragging .drop-hint { display: grid; }
 .ed-prev .s-canvas .ci.editing { cursor: text; background: rgba(255, 244, 200, .55); outline: 4px solid #e8590c; user-select: text; -webkit-user-select: text; }
 .cvsnap { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
 .ed-prev .s-canvas .ci.sel { outline: 4px solid #e8590c; outline-offset: 2px; }
+.ed-prev .s-canvas .ci.msel { outline: 4px solid #1c7ed6; outline-offset: 2px; }
+.ed-prev .s-canvas .ci.mhit { outline: 4px dashed #1c7ed6; outline-offset: 2px; }
+.s-canvas .cvm { position: absolute; z-index: 40; border: 3px dashed #1c7ed6; background: rgba(28, 126, 214, .12); pointer-events: none; }
+.s-canvas .cvgb { position: absolute; z-index: 30; border: 3px dashed #1c7ed6; pointer-events: none; }
 .ed-prev .s-canvas .ci .hd { position: absolute; width: 34px; height: 34px; background: #fff; border: 5px solid #e8590c; border-radius: 6px; z-index: 5; }
 .ed-prev .s-canvas .hd-nw { left: -17px; top: -17px; cursor: nwse-resize; }
 .ed-prev .s-canvas .hd-ne { right: -17px; top: -17px; cursor: nesw-resize; }

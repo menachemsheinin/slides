@@ -153,11 +153,15 @@
       h('a', { href: 'index.html' }, 'כל המצגות'));
     document.body.append(view, progress, ctrl, notes, ov);
 
+    const ovThumbs = [];
     const slides = deck.slides.map((s, i) => {
       const el = h('section', { class: 'slide ' + window.Slides.cls(s) });
       window.Slides.render(s).forEach((n) => el.append(n));
       stage.append(el);
-      ovGrid.append(h('button', { onclick: () => { go(i); toggleOv(false); } }, h('b', {}, i + 1), window.Slides.titleOf(s)));
+      const th = h('div', { class: 'th2' });
+      ovGrid.append(h('button', { onclick: () => { go(i); toggleOv(false); } }, th,
+        h('div', { class: 'cap' }, h('b', {}, i + 1), h('span', {}, window.Slides.titleOf(s)))));
+      ovThumbs.push({ th, def: s, built: false });
       const steps = [...el.querySelectorAll('[data-step]')].reduce((m, e) => Math.max(m, Number(e.dataset.step)), 0);
       return { def: s, el, steps };
     });
@@ -178,14 +182,35 @@
       sl.el.querySelectorAll('[data-step]').forEach((e) => e.classList.toggle('on', Number(e.dataset.step) <= step));
       cnt.textContent = cur + 1 + ' / ' + slides.length;
       bar.style.width = ((cur + 1) / slides.length) * 100 + '%';
-      notesBody.textContent = sl.def.notes || '';
+      if (sl.def.notesHtml) notesBody.innerHTML = window.Slides.sanitizeRich(sl.def.notesHtml);
+      else notesBody.textContent = sl.def.notes || '';
       [...ovGrid.children].forEach((b, i) => b.classList.toggle('cur', i === cur));
       history.replaceState(null, '', '#' + (cur + 1));
     }
     function go(i, st = 0) { cur = Math.max(0, Math.min(slides.length - 1, i)); step = st; render(); }
     function next() { if (step < slides[cur].steps) { step++; render(); } else if (cur < slides.length - 1) go(cur + 1); }
     function prev() { if (step > 0) { step--; render(); } else if (cur > 0) go(cur - 1, slides[cur - 1].steps); }
-    function toggleOv(on) { ov.classList.toggle('on', on === undefined ? !ov.classList.contains('on') : on); }
+    // תמונות ממוזערות של השקפים: נבנות בפתיחה הראשונה של הסקירה ומשתנות בקנה מידה לפי רוחב האריח
+    function buildOvThumbs() {
+      ovThumbs.forEach((t) => {
+        if (!t.built) {
+          t.built = true;
+          const st = h('div', { class: 'stage' });
+          const el = h('section', { class: 'slide on ' + window.Slides.cls(t.def) });
+          try { window.Slides.render(t.def).forEach((n) => el.append(n)); } catch (e) { /* שקף שבור: ממוזער ריק */ }
+          el.querySelectorAll('iframe, video').forEach((n) => n.replaceWith(h('div', { class: 'vid-empty' }, '▶')));
+          el.querySelectorAll('[data-step]').forEach((n) => n.classList.add('on'));
+          st.append(el);
+          t.th.append(st);
+        }
+        t.th.firstChild.style.transform = 'scale(' + (t.th.clientWidth / 1280) + ')';
+      });
+    }
+    function toggleOv(on) {
+      const open = on === undefined ? !ov.classList.contains('on') : on;
+      ov.classList.toggle('on', open);
+      if (open) buildOvThumbs();
+    }
     function fullscreen() {
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
@@ -208,6 +233,23 @@
       else if (k === 'n' || k === 'N' || k === 'מ') notes.classList.toggle('on');
       else if (k === 'Escape') { toggleOv(false); notes.classList.remove('on'); }
     });
+    // גלגלת: למטה = הבא, למעלה = הקודם (עם השהיה כדי לא לדלג על כמה שקופיות בגלילה אחת)
+    let wheelLock = 0;
+    document.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || e.metaKey) return; // זום
+      if (ov.classList.contains('on') || notes.contains(e.target)) return; // גלילה רגילה בסקירה ובהערות
+      e.preventDefault();
+      const now = Date.now();
+      if (now < wheelLock || Math.abs(e.deltaY) < 4) return;
+      wheelLock = now + 450;
+      (e.deltaY > 0 ? next : prev)();
+    }, { passive: false });
+    // לחיצה על אזור פנוי בשקופית (למשל מצביע/קליקר) מקדמת; רכיבים אינטראקטיביים לא מקדמים
+    view.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, input, select, textarea, video, iframe, .flip, .cmp, .tl, .counter, .timer, .cir-svg, .sw-row, .cs-grid, .cs-ctrl, .nw, .gt-row')) return;
+      if (String(getSelection())) return; // סימון טקסט
+      next();
+    });
     let sx = null;
     view.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
     view.addEventListener('touchend', (e) => {
@@ -216,11 +258,14 @@
       if (Math.abs(dx) > 60) (dx < 0 ? next : prev)();
       sx = null;
     });
-    let hideT;
-    const wake = () => { ctrl.classList.remove('hide'); clearTimeout(hideT); hideT = setTimeout(() => ctrl.classList.add('hide'), 2500); };
-    document.addEventListener('mousemove', wake);
+    // הסרגל התחתון מופיע רק כשהעכבר קרוב לקצה התחתון של המסך
+    const NEAR_BOTTOM = 90;
+    const showIfNear = (e) => ctrl.classList.toggle('hide', e.clientY < innerHeight - NEAR_BOTTOM);
+    document.addEventListener('pointermove', showIfNear);
+    document.addEventListener('mouseleave', () => ctrl.classList.add('hide'));
     addEventListener('resize', fit);
-    fit(); wake();
+    fit(); ctrl.classList.add('hide');
+    notes.classList.add('on'); // תיבת התוכן פתוחה כברירת מחדל
 
     const start = parseInt(location.hash.slice(1), 10);
     go(Number.isFinite(start) ? start - 1 : 0);

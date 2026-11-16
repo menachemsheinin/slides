@@ -524,6 +524,421 @@
     },
   };
 
+  /* מתגים אינטראקטיביים: לוחצים על מתגים ורואים את המספר הבינארי (ואת האות המתאימה) מתעדכנים */
+  const expl = (s) => (s.explain ? h('p', { class: 'sw-explain' }, s.explain) : null);
+  TYPES.switches = {
+    label: 'מתגים אינטראקטיביים',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'bits', t: 'select', label: 'מספר מתגים', opts: [['8', '8 (עד 255)'], ['4', '4 (עד 15)']] },
+      { k: 'letter', t: 'select', label: 'הצגת אות ASCII (רק ב-8 מתגים)', opts: [['1', 'כן'], ['', 'לא']] },
+      { k: 'start', t: 'num', label: 'ערך התחלתי (למשל 65)' },
+      { k: 'hint', t: 'text', label: 'שורת הנחיה' },
+    ],
+    blank: () => ({ type: 'switches', title: 'לחצו על המתגים', bits: '8', letter: '1', start: 0, hint: 'מתג דלוק מוסיף את המשקל שמעליו', notes: '' }),
+    cls: () => 's-switches',
+    render: (s) => {
+      const n = String(s.bits) === '4' ? 4 : 8;
+      const W = Array.from({ length: n }, (_, i) => Math.pow(2, n - 1 - i));
+      const start = Math.max(0, Math.min(Math.pow(2, n) - 1, Math.floor(Number(s.start) || 0)));
+      let rest = start;
+      const state = W.map((w) => { const on = rest >= w; if (on) rest -= w; return on; });
+      const showCh = n === 8 && !!s.letter;
+      const valEl = h('div', { class: 'sw-val' }), sumEl = h('div', { class: 'sw-sum' });
+      const chr = h('div', { class: 'sw-chr' }), code = h('div', { class: 'sw-code' });
+      const chEl = showCh ? h('div', { class: 'sw-ch' }, chr, code) : null;
+      const btns = [], bits = [];
+      const update = () => {
+        let v = 0; const parts = [];
+        state.forEach((on, i) => {
+          if (on) { v += W[i]; parts.push(W[i]); }
+          btns[i].classList.toggle('on', on);
+          bits[i].classList.toggle('on', on);
+          bits[i].textContent = on ? '1' : '0';
+        });
+        valEl.textContent = '= ' + v;
+        sumEl.textContent = parts.length ? parts.join(' + ') : '0';
+        if (showCh) {
+          chr.textContent = v > 32 && v < 127 ? String.fromCharCode(v) : (v === 32 ? '␣' : '·');
+          code.textContent = 'קוד ' + v;
+        }
+      };
+      const noFocus = (e) => e.preventDefault(); // שהרווח לא יפעיל מתג וגם יקדם שקף
+      const cols = W.map((w, i) => {
+        btns[i] = h('button', { class: 'sw-btn', type: 'button', 'aria-label': 'מתג ' + w, onmousedown: noFocus, onclick: () => { state[i] = !state[i]; update(); } }, h('i'));
+        bits[i] = h('div', { class: 'sw-bit' });
+        return h('div', { class: 'sw-col' }, h('div', { class: 'sw-w' }, String(w)), btns[i], bits[i]);
+      });
+      update();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' },
+          h('div', { class: 'sw-row' }, cols),
+          h('div', { class: 'sw-res' }, h('div', { class: 'sw-calc' }, valEl, sumEl), chEl,
+            h('button', { class: 'sw-reset', type: 'button', onmousedown: noFocus, onclick: () => { state.fill(false); update(); } }, 'אפס')),
+          s.hint ? h('p', { class: 'sw-hint' }, s.hint) : null),
+      ];
+    },
+  };
+
+  /* מעגל חשמלי אינטראקטיבי: שני מתגים בטור (AND) ובמקביל (OR) מדליקים נורה. לוחצים על המתגים בציור */
+  const CIR_SVG_SERIES = `<svg viewBox="0 0 430 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="מעגל עם שני מתגים בטור">
+    <g class="loop">
+      <path class="cw" d="M40 125 V40 H110"/><path class="cw" d="M170 40 H230"/><path class="cw" d="M290 40 H390 V118"/><path class="cw" d="M390 182 V240 H40 V145"/>
+    </g>
+    <path d="M18 125 H62" stroke="#333" stroke-width="7" stroke-linecap="round"/><path d="M28 145 H52" stroke="#333" stroke-width="7" stroke-linecap="round"/>
+    <g class="sw" data-sw="A"><circle cx="110" cy="40" r="7" fill="#333"/><circle cx="170" cy="40" r="7" fill="#333"/>
+      <line class="b-on" x1="110" y1="40" x2="170" y2="40" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <line class="b-off" x1="110" y1="40" x2="162" y2="8" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <text x="140" y="80" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">A</text>
+      <rect data-sw="A" x="96" y="0" width="88" height="62" fill="transparent" style="cursor:pointer"/></g>
+    <g class="sw" data-sw="B"><circle cx="230" cy="40" r="7" fill="#333"/><circle cx="290" cy="40" r="7" fill="#333"/>
+      <line class="b-on" x1="230" y1="40" x2="290" y2="40" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <line class="b-off" x1="230" y1="40" x2="282" y2="8" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <text x="260" y="80" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">B</text>
+      <rect data-sw="B" x="216" y="0" width="88" height="62" fill="transparent" style="cursor:pointer"/></g>
+    <circle class="glow" cx="390" cy="150" r="52" fill="#FFE066"/><circle class="bulb" cx="390" cy="150" r="32" stroke="#333" stroke-width="6"/>
+    <path d="M368 128 L412 172 M412 128 L368 172" stroke="#333" stroke-width="5" stroke-linecap="round"/>
+  </svg>`;
+  const CIR_SVG_PARALLEL = `<svg viewBox="0 0 430 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="מעגל עם שני מתגים במקביל">
+    <g class="main"><path class="cw" d="M40 125 V60 H110"/><path class="cw" d="M310 60 H390 V118"/><path class="cw" d="M390 182 V240 H40 V145"/></g>
+    <g class="brA"><path class="cw" d="M110 30 V60"/><path class="cw" d="M110 30 H150"/><path class="cw" d="M210 30 H310"/><path class="cw" d="M310 30 V60"/></g>
+    <g class="brB"><path class="cw" d="M110 60 V90"/><path class="cw" d="M110 90 H150"/><path class="cw" d="M210 90 H310"/><path class="cw" d="M310 60 V90"/></g>
+    <path d="M18 125 H62" stroke="#333" stroke-width="7" stroke-linecap="round"/><path d="M28 145 H52" stroke="#333" stroke-width="7" stroke-linecap="round"/>
+    <g class="sw" data-sw="A"><circle cx="150" cy="30" r="7" fill="#333"/><circle cx="210" cy="30" r="7" fill="#333"/>
+      <line class="b-on" x1="150" y1="30" x2="210" y2="30" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <line class="b-off" x1="150" y1="30" x2="202" y2="0" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <text x="180" y="62" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">A</text>
+      <rect data-sw="A" x="136" y="-4" width="88" height="56" fill="transparent" style="cursor:pointer"/></g>
+    <g class="sw" data-sw="B"><circle cx="150" cy="90" r="7" fill="#333"/><circle cx="210" cy="90" r="7" fill="#333"/>
+      <line class="b-on" x1="150" y1="90" x2="210" y2="90" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <line class="b-off" x1="150" y1="90" x2="202" y2="60" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+      <text x="180" y="124" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">B</text>
+      <rect data-sw="B" x="136" y="62" width="88" height="62" fill="transparent" style="cursor:pointer"/></g>
+    <circle class="glow" cx="390" cy="150" r="52" fill="#FFE066"/><circle class="bulb" cx="390" cy="150" r="32" stroke="#333" stroke-width="6"/>
+    <path d="M368 128 L412 172 M412 128 L368 172" stroke="#333" stroke-width="5" stroke-linecap="round"/>
+  </svg>`;
+  TYPES.circuit = {
+    label: 'מעגל חשמלי: מתגים ונורה',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'hint', t: 'text', label: 'שורת הנחיה' },
+    ],
+    blank: () => ({ type: 'circuit', title: 'מתגים שמקבלים החלטות', hint: 'לחצו על המתגים בציור', notes: '' }),
+    cls: () => 's-circuit',
+    render: (s) => {
+      const st = { A: false, B: false };
+      const mk = (svg, name, rule) => {
+        const box = h('div', { class: 'cir-svg', html: svg });
+        const state = h('div', { class: 'cir-state' });
+        const col = h('div', { class: 'cir-col' }, h('h3', {}, name), box, state, h('div', { class: 'cir-rule' }, rule));
+        return { col, box, state };
+      };
+      const ser = mk(CIR_SVG_SERIES, 'בטור: AND', 'כמו כספת עם שני מפתחות');
+      const par = mk(CIR_SVG_PARALLEL, 'במקביל: OR', 'כמו חדר עם שתי דלתות');
+      const sw = (box, key) => {
+        box.querySelectorAll('[data-sw="' + key + '"].sw .b-on').forEach((e) => { e.style.display = st[key] ? '' : 'none'; });
+        box.querySelectorAll('[data-sw="' + key + '"].sw .b-off').forEach((e) => { e.style.display = st[key] ? 'none' : ''; });
+      };
+      const on = (box, sel, v) => box.querySelectorAll(sel + ' .cw').forEach((e) => e.classList.toggle('on', v));
+      const lamp = (part, lit) => {
+        part.box.querySelector('.bulb').setAttribute('fill', lit ? '#FFE066' : '#E4E0D4');
+        part.box.querySelector('.glow').style.opacity = lit ? '.45' : '0';
+        part.state.textContent = lit ? 'הנורה דולקת' : 'הנורה כבויה';
+        part.state.classList.toggle('lit', lit);
+      };
+      const update = () => {
+        const and = st.A && st.B, or = st.A || st.B;
+        ['A', 'B'].forEach((k) => { sw(ser.box, k); sw(par.box, k); });
+        on(ser.box, '.loop', and); lamp(ser, and);
+        on(par.box, '.main', or); on(par.box, '.brA', st.A); on(par.box, '.brB', st.B); lamp(par, or);
+      };
+      [ser, par].forEach((p) => p.box.addEventListener('click', (e) => {
+        const k = e.target.closest && e.target.closest('rect[data-sw]');
+        if (k) { st[k.getAttribute('data-sw')] = !st[k.getAttribute('data-sw')]; update(); }
+      }));
+      update();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        s.hint ? h('p', { class: 'sw-hint', style: { margin: '0 0 6px', textAlign: 'right' } }, s.hint) : null,
+        h('div', { class: 'grow' }, h('div', { class: 'cir-wrap' }, ser.col, par.col)),
+      ];
+    },
+  };
+
+  /* קסקדת מתגים: כל מתג נקבע מהמתגים שמעליו, שורה אחרי שורה. עם XOR ומתג אחד נוצר המשולש של סרפינסקי (פרקטל) */
+  TYPES.cascade = {
+    label: 'קסקדת מתגים (פרקטל)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'rule', t: 'select', label: 'כלל התחלתי', opts: [['xor', 'XOR (פרקטל)'], ['or', 'OR (הצפה)'], ['and', 'AND (דועך)']] },
+      { k: 'rows', t: 'select', label: 'מספר שורות', opts: [['8', '8'], ['6', '6'], ['10', '10']] },
+      { k: 'hint', t: 'text', label: 'שורת הנחיה' },
+    ],
+    blank: () => ({ type: 'cascade', title: 'מתגים ששולטים במתגים', rule: 'xor', rows: '8', hint: 'כל מתג נקבע לפי שני המתגים שמעליו. לחצו על מתגי השורה העליונה', notes: '' }),
+    cls: () => 's-cascade',
+    render: (s) => {
+      const W = 17, MID = 8;
+      const R = Math.max(4, Math.min(12, parseInt(s.rows, 10) || 8));
+      const RULES = [['xor', 'XOR: פרקטל'], ['or', 'OR: הצפה'], ['and', 'AND: דועך']];
+      let rule = RULES.some((r) => r[0] === s.rule) ? s.rule : 'xor';
+      const top = Array(W).fill(false); top[MID] = true;
+      const f = { xor: (a, b) => a !== b, or: (a, b) => a || b, and: (a, b) => a && b };
+      const noFocus = (e) => e.preventDefault();
+      const cells = [];
+      const RULE_TXT = { xor: 'מתג דלוק אם בדיוק אחד משני המתגים שמעליו דלוק (XOR).', or: 'מתג דלוק אם לפחות אחד משני המתגים שמעליו דלוק (OR).', and: 'מתג דלוק רק אם שני המתגים שמעליו דלוקים (AND).' };
+      const hintEl = h('p', { class: 'sw-hint', style: { margin: '0 0 6px', textAlign: 'right' } });
+      const mark = (r, i, on) => [i - 1, i + 1].forEach((j) => cells[r - 1][j] && cells[r - 1][j].classList.toggle('pa', on));
+      const rowEls = Array.from({ length: R }, (_, r) => {
+        const row = h('div', { class: 'cs-row' + (r === 0 ? ' cs-top' : ''), style: { '--c': 'hsl(' + (150 - r * 16) + ' 58% 38%)' } },
+          Array.from({ length: W }, (_, i) => {
+            const el = r === 0
+              ? h('button', { class: 'cs-cell', type: 'button', 'aria-label': 'מתג', onmousedown: noFocus, onclick: () => { top[i] = !top[i]; update(); } })
+              : h('span', { class: 'cs-cell', onmouseenter: () => mark(r, i, true), onmouseleave: () => mark(r, i, false) });
+            (cells[r] = cells[r] || [])[i] = el;
+            return el;
+          }));
+        return row;
+      });
+      const modeBtns = RULES.map(([k, label]) => h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => { rule = k; update(); } }, label));
+      const reset = h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => { top.fill(false); top[MID] = true; update(); } }, 'מתג אחד באמצע');
+      const clear = h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => { top.fill(false); update(); } }, 'אפס');
+      const update = () => {
+        let prev = top.slice();
+        for (let r = 0; r < R; r++) {
+          const cur = r === 0 ? top : prev.map((_, i) => f[rule](!!prev[i - 1], !!prev[i + 1]));
+          cur.forEach((on, i) => cells[r][i].classList.toggle('on', !!on));
+          prev = cur;
+        }
+        RULES.forEach(([k], i) => modeBtns[i].classList.toggle('on', k === rule));
+        hintEl.textContent = RULE_TXT[rule];
+      };
+      update();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        hintEl,
+        h('div', { class: 'grow' },
+          h('div', { class: 'cs-grid' }, rowEls),
+          h('div', { class: 'cs-ctrl' }, modeBtns, reset, clear)),
+      ];
+    },
+  };
+
+  /* שרשרת מתגים (דומינו): לוחצים על המתג הראשון, וכל מתג מדליק את הבא אחריו עד הנורה שבסוף */
+  const CH_ARROW = '<svg viewBox="0 0 50 20" xmlns="http://www.w3.org/2000/svg"><path d="M46 10H12" stroke-width="6" stroke-linecap="round"/><path d="M2 10 L16 1 V19 Z" stroke-width="0"/></svg>';
+  TYPES.chain = {
+    label: 'שרשרת מתגים (דומינו)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'hint', t: 'text', label: 'שורת הנחיה' },
+      { k: 'count', t: 'select', label: 'מספר שלבים (כולל הנורה)', opts: [['5', '5'], ['4', '4'], ['6', '6']] },
+      { k: 'caption', t: 'text', label: 'משפט הסבר בתחתית' },
+    ],
+    blank: () => ({ type: 'chain', title: 'מתג אחד מדליק את הבא', hint: 'לחצו על המתג הראשון', count: '5', caption: 'כל מתג נדלק כשהמתג שלפניו נדלק, כמו דומינו', notes: '' }),
+    cls: () => 's-chain',
+    render: (s) => {
+      const K = Math.max(3, Math.min(6, parseInt(s.count, 10) || 5));
+      const state = Array(K).fill(false);
+      let token = 0;
+      const noFocus = (e) => e.preventDefault();
+      const els = [], arrows = [];
+      const stages = [];
+      for (let i = 0; i < K; i++) {
+        const last = i === K - 1;
+        const el = last
+          ? h('div', { class: 'ch-lamp' })
+          : h('button', { class: 'ch-sw' + (i === 0 ? ' me' : ''), type: 'button', 'aria-label': 'מתג ' + (i + 1), disabled: i !== 0, onmousedown: noFocus, onclick: i === 0 ? () => press() : null });
+        els[i] = el;
+        stages.push(h('div', { class: 'ch-st' }, h('div', { class: 'ch-box' }, el), h('div', { class: 'ch-lab' }, last ? 'נורה' : 'מתג ' + (i + 1))));
+        if (!last) { arrows[i] = h('div', { class: 'ch-arrow', html: CH_ARROW }); stages.push(arrows[i]); }
+      }
+      const update = () => {
+        state.forEach((on, i) => els[i].classList.toggle('on', on));
+        arrows.forEach((a, i) => a.classList.toggle('on', state[i]));
+      };
+      const press = () => {
+        state[0] = !state[0]; update();
+        const t = ++token;
+        for (let k = 1; k < K; k++) setTimeout(() => { if (t === token) { state[k] = state[k - 1]; update(); } }, 450 * k);
+      };
+      update();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        s.hint ? h('p', { class: 'sw-hint', style: { margin: '0 0 6px', textAlign: 'right' } }, s.hint) : null,
+        h('div', { class: 'grow' },
+          h('div', { class: 'ch-row' }, stages),
+          s.caption ? h('p', { class: 'ch-cap' }, s.caption) : null),
+      ];
+    },
+  };
+
+  /* רשת מתגים (המשך שקף הדומינו): ארבעה מתגי קלט שולטים בשכבה הבאה, וכל שכבה בשכבה שאחריה, עד הנורה. ההדלקה "זולגת" שכבה אחר שכבה */
+  const NW_LAYERS = [4, 3, 2, 1];
+  const NW_GATES = [
+    null,
+    [{ op: 'and', from: [0, 1] }, { op: 'or', from: [1, 2] }, { op: 'and', from: [2, 3] }],
+    [{ op: 'or', from: [0, 1] }, { op: 'and', from: [1, 2] }],
+    [{ op: 'and', from: [0, 1] }],
+  ];
+  TYPES.network = {
+    label: 'רשת מתגים (שכבות)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+    ],
+    blank: () => ({ type: 'network', title: 'מתגים ששולטים במתגים, שכבה אחר שכבה', explain: 'כל שכבה מחליטה לפי השכבה שלפניה (AND או OR), עד שנדלקת הנורה.', notes: '' }),
+    cls: () => 's-network',
+    render: (s) => {
+      const W = 1000, H = 335, GAP = 85, CX = 900, DX = 270, CY = H / 2, PW = 90;
+      const noFocus = (e) => e.preventDefault();
+      const nodes = NW_LAYERS.map((n, l) => Array.from({ length: n }, (_, i) => ({ l, i, x: CX - l * DX, y: CY + (i - (n - 1) / 2) * GAP, on: false })));
+      const wrap = h('div', { class: 'nw', style: { width: W + 'px', height: H + 'px' } });
+      let svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+      nodes.forEach((layer, l) => layer.forEach((nd, i) => {
+        if (l === 0) return;
+        NW_GATES[l][i].from.forEach((pi) => {
+          const p = nodes[l - 1][pi];
+          svg += '<path class="nw-l" data-p="' + (l - 1) + '-' + pi + '" d="M' + (p.x - PW / 2 + 4) + ' ' + p.y + ' L' + (nd.x + PW / 2 - 4) + ' ' + nd.y + '"/>';
+        });
+      }));
+      svg += '</svg>';
+      wrap.append(h('div', { class: 'nw-lines', html: svg }));
+      let token = 0;
+      const update = () => {
+        nodes.forEach((layer) => layer.forEach((nd) => nd.el.classList.toggle('on', nd.on)));
+        wrap.querySelectorAll('.nw-l').forEach((ln) => { const [l, i] = ln.getAttribute('data-p').split('-').map(Number); ln.classList.toggle('on', nodes[l][i].on); });
+      };
+      const run = () => {
+        const t = ++token;
+        for (let l = 1; l < NW_LAYERS.length; l++) {
+          setTimeout(() => {
+            if (t !== token) return;
+            nodes[l].forEach((nd, i) => {
+              const g = NW_GATES[l][i], a = nodes[l - 1][g.from[0]].on, b = nodes[l - 1][g.from[1]].on;
+              nd.on = g.op === 'and' ? a && b : a || b;
+            });
+            update();
+          }, 550 * l);
+        }
+      };
+      const press = (nd) => { nd.on = !nd.on; update(); run(); };
+      nodes.forEach((layer, l) => layer.forEach((nd) => {
+        const last = l === NW_LAYERS.length - 1;
+        nd.el = last
+          ? h('div', { class: 'nw-lamp', style: { left: nd.x - 36 + 'px', top: nd.y - 36 + 'px' } })
+          : l === 0
+            ? h('button', { class: 'nw-n me', type: 'button', 'aria-label': 'מתג קלט', style: { left: nd.x - PW / 2 + 'px', top: nd.y - 23 + 'px' }, onmousedown: noFocus, onclick: () => press(nd) })
+            : h('span', { class: 'nw-n', style: { left: nd.x - PW / 2 + 'px', top: nd.y - 23 + 'px' } });
+        wrap.append(nd.el);
+        const txt = l === 0 ? 'ABCD'[nd.i] : last ? 'נורה' : (NW_GATES[l][nd.i].op === 'and' ? 'AND' : 'OR');
+        wrap.append(h('div', { class: 'nw-lab' + (l === 0 ? ' in' : last ? ' lamp' : ''), style: { left: nd.x - PW / 2 + 'px', top: nd.y - (last ? 62 : 52) + 'px' } }, txt));
+      }));
+      const setInputs = (v) => { nodes[0].forEach((nd) => { nd.on = v; }); update(); run(); };
+      update();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' },
+          wrap,
+          h('div', { class: 'cs-ctrl' },
+            h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => setInputs(true) }, 'הדלק את כל הקלטים'),
+            h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => setInputs(false) }, 'אפס'))),
+      ];
+    },
+  };
+
+  /* שער לוגי: מתגי קלט, סמל השער, נורת פלט וטבלת אמת שמסמנת את השורה הנוכחית */
+  const GATE_SHAPES = {
+    and: { out: 395, d: 'M270 80 H335 A60 60 0 0 1 335 200 H270 Z' },
+    or: { out: 395, d: 'M270 80 Q335 80 395 140 Q335 200 270 200 Q300 140 270 80 Z' },
+    xor: { out: 395, d: 'M270 80 Q335 80 395 140 Q335 200 270 200 Q300 140 270 80 Z', extra: '<path d="M252 80 Q282 140 252 200" fill="none" stroke="#333" stroke-width="5" stroke-linecap="round"/>' },
+    not: { out: 394, d: 'M270 92 L270 188 L372 140 Z', extra: '<circle cx="383" cy="140" r="11" fill="#fff" stroke="#333" stroke-width="5"/>' },
+  };
+  const GATE_FN = { and: (a, b) => a && b, or: (a, b) => a || b, xor: (a, b) => a !== b, not: (a) => !a };
+  const GATE_TXT = {
+    and: 'AND: הפלט 1 רק אם שני הקלטים 1.',
+    or: 'OR: הפלט 1 אם לפחות אחד מהקלטים 1.',
+    xor: 'XOR: הפלט 1 אם הקלטים שונים זה מזה.',
+    not: 'NOT: הופך. 1 הופך ל-0, ו-0 הופך ל-1.',
+  };
+  TYPES.gate = {
+    label: 'שער לוגי (AND, OR, XOR, NOT)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'gate', t: 'select', label: 'שער התחלתי', opts: [['and', 'AND'], ['or', 'OR'], ['xor', 'XOR'], ['not', 'NOT']] },
+    ],
+    blank: () => ({ type: 'gate', title: 'שער לוגי', explain: 'שער מקבל 0 או 1 ומחזיר 0 או 1 לפי כלל קבוע. לחצו על המתגים.', gate: 'and', notes: '' }),
+    cls: () => 's-gate',
+    render: (s) => {
+      const st = { A: false, B: false };
+      let gate = GATE_SHAPES[s.gate] ? s.gate : 'and';
+      const box = h('div', { class: 'gt-svg' });
+      const tbl = h('div', { class: 'gt-tbl' });
+      const rule = h('p', { class: 'gt-rule' });
+      const noFocus = (e) => e.preventDefault();
+      const MODES = [['and', 'AND'], ['or', 'OR'], ['xor', 'XOR'], ['not', 'NOT']];
+      const btns = MODES.map(([k, label]) => h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => { gate = k; draw(); } }, label));
+      const pill = (key, cy, on) =>
+        '<g data-in="' + key + '"><rect x="20" y="' + (cy - 25) + '" width="100" height="50" rx="25" fill="' + (on ? '#2B8A3E' : '#B9B4A8') + '"/>' +
+        '<circle cx="' + (on ? 95 : 45) + '" cy="' + cy + '" r="20" fill="#fff" stroke="#00000033" stroke-width="2"/>' +
+        '<text x="70" y="' + (cy - 36) + '" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">' + key + '</text>' +
+        '<rect data-in="' + key + '" x="10" y="' + (cy - 42) + '" width="120" height="84" fill="transparent" style="cursor:pointer"/></g>';
+      const draw = () => {
+        const g = GATE_SHAPES[gate], two = gate !== 'not';
+        const out = two ? GATE_FN[gate](st.A, st.B) : GATE_FN.not(st.A);
+        const w = (on) => 'fill="none" stroke="' + (on ? '#E8590C' : '#9A958A') + '" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"';
+        let svg = '<svg viewBox="0 0 660 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="שער לוגי">';
+        if (two) {
+          svg += '<path ' + w(st.A) + ' d="M120 70 H235 V105 H275"/>';
+          svg += '<path ' + w(st.B) + ' d="M120 210 H235 V175 H275"/>';
+        } else {
+          svg += '<path ' + w(st.A) + ' d="M120 70 H235 V140 H272"/>';
+        }
+        svg += '<path ' + w(out) + ' d="M' + g.out + ' 140 H550"/>';
+        svg += '<path d="' + g.d + '" fill="#FBF8F0" stroke="#333" stroke-width="6" stroke-linejoin="round"/>' + (g.extra || '');
+        svg += pill('A', 70, st.A) + (two ? pill('B', 210, st.B) : '');
+        svg += '<circle cx="' + 590 + '" cy="140" r="64" fill="#FFE066" opacity="' + (out ? 0.45 : 0) + '"/>';
+        svg += '<circle cx="590" cy="140" r="38" fill="' + (out ? '#FFE066' : '#E4E0D4') + '" stroke="#333" stroke-width="6"/>';
+        svg += '<path d="M563 113 L617 167 M617 113 L563 167" stroke="#333" stroke-width="5" stroke-linecap="round"/>';
+        svg += '</svg>';
+        box.innerHTML = svg;
+        // טבלת אמת
+        const rows = two ? [[0, 0], [0, 1], [1, 0], [1, 1]] : [[0], [1]];
+        let tb = '<table><tr>' + (two ? '<th>A</th><th>B</th>' : '<th>A</th>') + '<th>פלט</th></tr>';
+        rows.forEach((r) => {
+          const cur = two ? (r[0] === +st.A && r[1] === +st.B) : (r[0] === +st.A);
+          const o = two ? +GATE_FN[gate](!!r[0], !!r[1]) : +GATE_FN.not(!!r[0]);
+          tb += '<tr' + (cur ? ' class="cur"' : '') + '>' + r.map((v) => '<td>' + v + '</td>').join('') + '<td class="o' + (o ? ' one' : '') + '">' + o + '</td></tr>';
+        });
+        tbl.innerHTML = tb + '</table>';
+        rule.textContent = GATE_TXT[gate];
+        MODES.forEach(([k], i) => btns[i].classList.toggle('on', k === gate));
+      };
+      box.addEventListener('click', (e) => {
+        const r = e.target.closest && e.target.closest('rect[data-in]');
+        if (r) { const k = r.getAttribute('data-in'); st[k] = !st[k]; draw(); }
+      });
+      draw();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' },
+          h('div', { class: 'gt-row' }, box, tbl),
+          rule,
+          h('div', { class: 'cs-ctrl' }, btns)),
+      ];
+    },
+  };
+
   /* שקף חופשי: קנבס 1920×1080 עם רכיבים במיקום מוחלט (טקסט, תמונה, טבלה). נערך בעורך בגרירה, ונקלט מ-PowerPoint בפריסה המקורית */
   const CV_FONTS = { he: "'Heebo', Arial, sans-serif", arial: 'Arial, Helvetica, sans-serif', serif: "Georgia, 'Times New Roman', serif" };
   const cvItem = (it, i) => {
@@ -558,7 +973,7 @@
       const ls = String(it.text || '').split('\n');
       st.direction = it.dir || (/[֐-׿]/.test(it.text || '') ? 'rtl' : 'ltr'); // לועזית בלבד: סדר סימנים ומספרים נכון
       if (it.valign === 'middle' || it.valign === 'bottom') Object.assign(st, { display: 'flex', flexDirection: 'column', justifyContent: it.valign === 'middle' ? 'center' : 'flex-end' });
-      const body = it.list ? h(it.list === 'number' ? 'ol' : 'ul', {}, ls.map((l) => h('li', {}, l))) : h('div', { class: 'cv-t' }, lines(it.text));
+      const body = it.html ? h('div', { class: 'cv-t cv-rich', html: sanitizeRich(it.html) }) : it.list ? h(it.list === 'number' ? 'ol' : 'ul', {}, ls.map((l) => h('li', {}, l))) : h('div', { class: 'cv-t' }, lines(it.text));
       inner = it.link ? h('a', { href: it.link, target: '_blank', rel: 'noopener', style: { color: 'inherit', textDecoration: 'none' } }, body) : body;
     }
     const tf = [it.rot ? 'rotate(' + it.rot + 'deg)' : '', it.flip === 'h' ? 'scaleX(-1)' : ''].filter(Boolean).join(' ');
@@ -580,8 +995,33 @@
   const LOGO_SVG = '<svg viewBox="73 73 301 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M73 73 H152 L374 373 H296 Z M286 73 H374 V190 Z"/></svg>';
   const logo = () => h('div', { class: 'logo', html: LOGO_SVG });
 
+  /* טקסט עשיר בשקף חופשי: רק תגיות עיצוב בטוחות (הדגשה, קו תחתון, נטוי, צבע, רשימות). כל השאר נמחק */
+  const RICH_OK = new Set(['B', 'I', 'U', 'SPAN', 'DIV', 'P', 'BR', 'OL', 'UL', 'LI']);
+  const RICH_MAP = { STRONG: 'b', EM: 'i' };
+  const sanitizeRich = (html) => {
+    const src = new DOMParser().parseFromString('<body>' + String(html || '') + '</body>', 'text/html').body;
+    const walk = (from, to) => {
+      from.childNodes.forEach((n) => {
+        if (n.nodeType === 3) { to.append(document.createTextNode(n.nodeValue)); return; }
+        if (n.nodeType !== 1) return;
+        const tag = RICH_MAP[n.tagName] ? RICH_MAP[n.tagName].toUpperCase() : n.tagName;
+        if (!RICH_OK.has(tag)) { if (!/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED)$/.test(tag)) walk(n, to); return; }
+        const el = document.createElement(tag.toLowerCase());
+        if (tag === 'SPAN') {
+          const c = (n.style && n.style.color) || '';
+          if (/^(#[0-9a-f]{3,8}|rgba?\([\d\s,.%]+\)|[a-z]+)$/i.test(c)) el.style.color = c;
+        }
+        walk(n, el);
+        to.append(el);
+      });
+    };
+    const out = document.createElement('div');
+    walk(src, out);
+    return out.innerHTML;
+  };
+
   const Slides = {
-    COLORS, COLOR_OPTS, TYPES, parseEmbed,
+    COLORS, COLOR_OPTS, TYPES, parseEmbed, sanitizeRich,
     // שקף תמונה ישן (שדה src אחד) הופך לרשימת תמונות
     normalize: (s) => {
       if (s && s.type === 'image' && !Array.isArray(s.items)) {
