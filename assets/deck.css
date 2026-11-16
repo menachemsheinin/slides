@@ -290,17 +290,33 @@ body.player { overflow: hidden; background: #0d0c0b; }
 .nw-lab.in { color: #6A645A; }
 .nw-lab.lamp { color: #6A645A; }
 /* שקף שער לוגי */
-.s-gate .grow { align-items: center; justify-content: flex-start; margin-top: 4px; }
-.s-gate h2 { margin-bottom: 4px; font-size: 52px; }
-.gt-row { direction: ltr; display: flex; align-items: center; justify-content: center; gap: 36px; }
-.gt-svg svg { width: 560px; height: auto; display: block; }
-.gt-tbl table { border-collapse: collapse; font-size: 30px; text-align: center; direction: ltr; }
-.gt-tbl th, .gt-tbl td { padding: 2px 20px; border-bottom: 2px solid #D5CEBD; }
-.gt-tbl th { font-size: 28px; color: #6A645A; border-bottom: 3px solid #333; }
+.s-gate .grow { align-items: center; justify-content: flex-start; margin-top: 18px; }
+.s-gate h2 { margin-bottom: 0; font-size: 48px; }
+.s-gate .sw-explain { font-size: 26px; margin: 4px 0 0; }
+.gt-row { direction: ltr; display: flex; align-items: center; justify-content: center; gap: 130px; }
+.gt-svg svg { width: 430px; height: auto; display: block; }
+.gt-tbl table { border-collapse: collapse; font-size: 26px; text-align: center; direction: ltr; }
+.gt-tbl th, .gt-tbl td { padding: 4px 22px; border-bottom: 2px solid #D5CEBD; }
+.gt-tbl th { font-size: 24px; color: #6A645A; border-bottom: 3px solid #333; }
 .gt-tbl tr.cur td { background: #FDE6D6; font-weight: 800; }
 .gt-tbl td.o { color: #8A857A; }
 .gt-tbl td.o.one { color: #2B8A3E; font-weight: 800; }
-.gt-rule { font-size: 30px; font-weight: 700; margin: 0; text-align: center; }
+.gt-rule { font-size: 28px; font-weight: 700; margin: 34px 0 0; text-align: center; }
+.s-gate .cs-ctrl { margin-top: 30px; gap: 18px; }
+/* שקף שער מכני (גלגלי שיניים) */
+.s-gears .grow { align-items: center; justify-content: flex-start; margin-top: 4px; }
+.s-gears h2 { margin-bottom: 4px; font-size: 52px; }
+.s-gears .gr-svg svg { width: 590px; }
+.gr-row { direction: ltr; display: flex; justify-content: center; }
+.gr-svg svg { width: 640px; height: auto; display: block; }
+.gr-w { transition: transform .45s ease, opacity .45s ease; }
+.gr-w path { transition: fill .3s; }
+/* שקפי מחבר (חצי ו-4 ביטים) */
+.s-adder .grow { align-items: center; justify-content: flex-start; margin-top: 4px; }
+.s-adder h2 { margin-bottom: 4px; font-size: 52px; }
+.s-adder .gr-svg svg { width: 620px; }
+.ad-eq { font-size: 40px; font-weight: 800; margin: 2px 0 0; text-align: center; }
+.ad-eq small { font-size: 26px; font-weight: 600; color: #6A645A; }
 .ed-prev { position: relative; }
 .rtbar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 4px; background: #1d1b18; padding: 5px 8px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); direction: rtl; }
 .rtbar button { font: inherit; font-size: 15px; min-width: 30px; height: 30px; padding: 0 8px; border: 0; border-radius: 5px; background: rgba(255, 255, 255, .12); color: #f6f0e4; cursor: pointer; }
@@ -480,3 +496,37 @@ body.dragging .drop-hint { display: grid; }
 .cvb.on, .cvlist .cvb.on { background: #fff1e6; border-color: #e8590c; font-weight: 700; }
 .cvpos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .cvpos .fld { margin: 0; }
+
+/* שער לוגי כרכיבים נפרדים בקנבס */
+.cv-gate { direction: ltr; }
+.cv-gate .gt-svg svg { width: 100%; }
+.cv-gate .gt-tbl table { font-size: inherit; margin: 0 auto; }
+.cv-gate .gt-tbl th { font-size: .85em; }
+.cv-gate .gt-rule { font-size: inherit; margin: 0; direction: rtl; }
+.cv-gate .cs-ctrl { margin: 0; gap: 20px; }
+.cv-gate .cs-mode { font-size: inherit; }
+
+/* שקף עשרוני מול בינארי */
+.s-binary .grow { align-items: center; justify-content: flex-start; margin-top: 4px; }
+.s-binary h2 { margin-bottom: 0; font-size: 46px; }
+.s-binary .sw-explain { font-size: 25px; margin: 2px 0 0; }
+.bd-row { direction: ltr; display: flex; gap: 50px; justify-content: center; align-items: flex-start; }
+.bd-panel { background: #fff; border: 2px solid #D5CEBD; border-radius: 14px; padding: 12px 24px 12px; text-align: center; }
+.bd-panel h3 { margin: 0; font-size: 30px; }
+.bd-sub { margin: 2px 0 10px; font-size: 19px; color: #6A645A; max-width: 520px; direction: rtl; }
+.bd-cols { display: flex; gap: 12px; justify-content: center; direction: ltr; }
+.bd-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bd-sw { position: relative; width: 50px; height: 84px; border-radius: 25px; background: #B9B4A8; border: 0; padding: 0; cursor: pointer; transition: background .2s; }
+.bd-sw::after { content: ''; position: absolute; left: 5px; bottom: 5px; width: 40px; height: 40px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .2s; }
+.bd-sw.on { background: #2B8A3E; }
+.bd-sw.on::after { transform: translateY(-34px); }
+.bd-bit { font-size: 28px; font-weight: 800; color: #9A958A; line-height: 1; }
+.bd-bit.on { color: #2B8A3E; }
+.bd-digit { font: inherit; font-size: 52px; font-weight: 800; width: 100px; height: 84px; border-radius: 12px; border: 3px solid #1C7ED6; background: #fff; color: #0A0A0A; cursor: pointer; }
+.bd-digit:hover { background: #EAF3FC; }
+.bd-pv { font-size: 20px; font-weight: 700; color: #6A645A; }
+.bd-bcd { font-size: 22px; font-weight: 700; color: #1C7ED6; direction: ltr; letter-spacing: 2px; }
+.bd-sum { margin-top: 6px; font-size: 24px; font-weight: 700; color: #3d3a34; }
+.bd-note { margin: 4px 0 0; font-size: 18px; color: #6A645A; max-width: 440px; line-height: 1.3; direction: rtl; }
+.bd-eq { text-align: center; font-size: 32px; font-weight: 800; margin: 12px 0 0; }
+.s-binary .cs-ctrl { margin-top: 10px; }

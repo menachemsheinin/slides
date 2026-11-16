@@ -246,7 +246,8 @@
     }, { passive: false });
     // לחיצה על אזור פנוי בשקופית (למשל מצביע/קליקר) מקדמת; רכיבים אינטראקטיביים לא מקדמים
     view.addEventListener('click', (e) => {
-      if (e.target.closest('button, a, input, select, textarea, video, iframe, .flip, .cmp, .tl, .counter, .timer, .cir-svg, .sw-row, .cs-grid, .cs-ctrl, .nw, .gt-row')) return;
+      if (!e.target.isConnected) return; // הרכיב צויר מחדש בלחיצה (למשל מתג): אינטראקטיבי, לא מקדם
+      if (e.target.closest('button, a, input, select, textarea, video, iframe, .flip, .cmp, .tl, .counter, .timer, .cir-svg, .sw-row, .cs-grid, .cs-ctrl, .nw, .gt-row, .gr-row, .cv-gate')) return;
       if (String(getSelection())) return; // סימון טקסט
       next();
     });

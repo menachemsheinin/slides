@@ -246,8 +246,10 @@
         if (n.isContentEditable) { e.stopPropagation(); return; }
         const ae = document.activeElement; if (ae && ae !== document.body && ae.blur) ae.blur(); // שהמקשים (Ctrl+Z) יפעלו על המצגת
         e.preventDefault(); e.stopPropagation();
-        if (e.shiftKey || e.ctrlKey || e.metaKey) { toggleSel(i); renderPreview(); renderForm(); return; } // הוספה/הסרה מהבחירה
         const ml = multiList();
+        const isSel = ml ? ml.includes(i) : selItem === i;
+        // Shift/Ctrl על אובייקט שאינו נבחר מוסיף לבחירה. על אובייקט נבחר: גרירה (עם Shift: אורתוגונלית)
+        if ((e.shiftKey || e.ctrlKey || e.metaKey) && !isSel) { toggleSel(i); renderPreview(); renderForm(); return; }
         if (ml && ml.includes(i)) { startGroupDrag(e, s, ml, i); return; } // גרירת כל הנבחרים יחד
         selectItem(i);
         const cur = stage.querySelector('.cv [data-i="' + i + '"]');
@@ -426,9 +428,10 @@
     const tg = snapOn ? snapTargets(s, i, cv) : null, thr = 8 / (k * 1.5);
     let moved = false;
     const move = (ev) => {
-      const dx = Math.round((ev.clientX - sx) / k), dy = Math.round((ev.clientY - sy) / k);
+      let dx = Math.round((ev.clientX - sx) / k), dy = Math.round((ev.clientY - sy) / k);
       if (!dx && !dy && !moved) return;
       moved = true;
+      if (mode === 'move' && ev.shiftKey) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; }
       const free = ev.altKey || !tg;
       let hx = [], hy = [];
       if (mode === 'move') {
@@ -474,8 +477,9 @@
     const o = list.map((i) => ({ i, x: s.items[i].x || 0, y: s.items[i].y || 0 }));
     let moved = false;
     const mv = (ev) => {
-      const dx = Math.round((ev.clientX - sx) / k), dy = Math.round((ev.clientY - sy) / k);
+      let dx = Math.round((ev.clientX - sx) / k), dy = Math.round((ev.clientY - sy) / k);
       if (!dx && !dy && !moved) return;
+      if (ev.shiftKey) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; }
       if (!moved) { moved = true; cv.querySelectorAll('.cvgb').forEach((x) => x.remove()); }
       o.forEach((p) => {
         const it = s.items[p.i];
@@ -520,6 +524,11 @@
       { k: 'flip', t: 'select', label: 'היפוך', opts: [['', 'ללא'], ['h', 'אופקי']] },
       { k: 'rot', t: 'num', label: 'סיבוב (מעלות)' },
     ],
+    gate: [
+      { k: 'part', t: 'select', label: 'חלק', opts: [['circuit', 'סרטוט השער והמתגים'], ['table', 'טבלת אמת'], ['rule', 'שורת הכלל'], ['buttons', 'כפתורי בחירת שער']] },
+      { k: 'gate', t: 'select', label: 'שער התחלתי (נקבע לפי החלק הראשון)', opts: [['and', 'AND'], ['or', 'OR'], ['xor', 'XOR'], ['not', 'NOT']] },
+      { k: 'size', t: 'num', label: 'גודל טקסט (טבלה, כלל, כפתורים)' },
+    ],
     table: [
       { k: 'rows', t: 'long', rows: 6, label: 'שורות (תאים מופרדים ב-|)' },
       { k: 'colw', t: 'text', label: 'רוחב עמודות באחוזים (למשל 78,22)' },
@@ -531,6 +540,7 @@
   const itemName = (it) => {
     if (it.kind === 'image') return '🖼 ' + (it.alt || (it.src || '').split('/').pop() || 'תמונה');
     if (it.kind === 'table') return '▦ טבלה';
+    if (it.kind === 'gate') return '⚡ ' + ({ circuit: 'שער: סרטוט', table: 'שער: טבלת אמת', rule: 'שער: שורת הכלל', buttons: 'שער: כפתורים' }[it.part || 'circuit']);
     if (it.kind === 'shape') return '➜ ' + ({ arrow: 'חץ', line: 'קו', path: 'עקומה' }[it.shape] || 'צורה');
     return 'T ' + String(it.text || '').split('\n')[0].slice(0, 28);
   };
@@ -540,6 +550,12 @@
       image: { kind: 'image', src: '', alt: '', fit: 'contain', bg: '', x: 560, y: 240, w: 800, h: 600 },
       shape: { kind: 'shape', shape: 'arrow', fill: '#C00000', stroke: '', sw: 0, flip: 'h', rot: 0, x: 800, y: 480, w: 200, h: 100 },
       table: { kind: 'table', rows: 'כותרת א | כותרת ב\nתא | תא\nתא | תא', colw: '50,50', header: 'yes', size: 36, color: '#0A0A0A', x: 240, y: 300, w: 1440, h: 300 } }[kind];
+    if (kind === 'gate') { // שער שלם = ארבעה רכיבים נפרדים עם מצב משותף
+      const G = (part, x, y, w, h, size) => ({ kind: 'gate', part, gate: 'and', size, x, y, w, h });
+      const n0 = s.items.length;
+      s.items.push(G('circuit', 340, 300, 640, 292), G('table', 1100, 280, 460, 330, 36), G('rule', 360, 650, 1200, 60, 40), G('buttons', 560, 750, 800, 80, 30));
+      setSel([n0, n0 + 1, n0 + 2, n0 + 3]); structural(); return;
+    }
     s.items.push(clone(base)); setSel([s.items.length - 1]); structural();
   }
   const mvItem = (d) => {
@@ -561,7 +577,8 @@
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('text') }, '+ טקסט'),
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('image') }, '+ תמונה'),
         h('button', { class: 'primary', type: 'button', onclick: () => addItem('table') }, '+ טבלה'),
-        h('button', { class: 'primary', type: 'button', onclick: () => addItem('shape') }, '+ חץ')),
+        h('button', { class: 'primary', type: 'button', onclick: () => addItem('shape') }, '+ חץ'),
+        h('button', { class: 'primary', type: 'button', onclick: () => addItem('gate') }, '+ שער לוגי')),
       h('div', { class: 'cvlist' }, s.items.map((it, i) =>
         h('button', { type: 'button', class: 'cvb' + ((multiList() ? multiList().includes(i) : i === selItem) ? ' on' : ''), title: 'Shift + לחיצה: הוספה לבחירה', onclick: (e) => { if (e.shiftKey || e.ctrlKey || e.metaKey) toggleSel(i); else setSel([i]); renderPreview(); renderForm(); } }, itemName(it)))));
     const mlist = multiList();
@@ -594,6 +611,33 @@
     list.forEach((i) => {
       const it = clone(s.items[i]);
       it.x = (it.x || 0) + 40; it.y = (it.y || 0) + 40;
+      s.items.push(it); fresh.push(s.items.length - 1);
+    });
+    setSel(fresh); structural();
+  }
+  /* העתקה והדבקה של רכיבים בין שקפים (Ctrl+C / Ctrl+X / Ctrl+V). נשמר גם ב-localStorage, כך שעובד בין מצגות */
+  const CLIP_KEY = 'slides-editor-clip';
+  let clip = null;
+  function copyItems(cut) {
+    const s = deck.slides[sel], list = selIdx(s);
+    if (!list.length) return;
+    clip = { from: sel, items: list.slice().sort((a, b) => a - b).map((i) => clone(s.items[i])) };
+    try { localStorage.setItem(CLIP_KEY, JSON.stringify(clip)); } catch (_) {}
+    try { navigator.clipboard.writeText('[slides-items]').catch(() => {}); } catch (_) {} // מחליף תמונה ישנה בלוח, כדי שההדבקה הבאה תהיה של הרכיבים
+    if (cut) delItem();
+  }
+  function pasteItems() {
+    const s = deck.slides[sel];
+    if (!s || s.type !== 'canvas') return;
+    let c = clip;
+    if (!c) { try { c = JSON.parse(localStorage.getItem(CLIP_KEY) || 'null'); } catch (_) {} if (c) clip = c; }
+    if (!c || !c.items || !c.items.length) return;
+    if (c.from === sel) c.n = (c.n || 0) + 1; else c.n = 0;
+    const off = 40 * c.n; // באותו שקף: הזזה קלה בכל הדבקה, כדי שלא יסתיר את המקור
+    const fresh = [];
+    c.items.forEach((src) => {
+      const it = clone(src);
+      it.x = (it.x || 0) + off; it.y = (it.y || 0) + off;
       s.items.push(it); fresh.push(s.items.length - 1);
     });
     setSel(fresh); structural();
@@ -820,7 +864,11 @@
 
   document.addEventListener('paste', async (e) => {
     const g = grab(e.clipboardData || { files: [], items: [], getData: () => '' });
-    if (!g.files.length) return; // הדבקת טקסט רגילה
+    if (!g.files.length) { // אין תמונה בלוח: הדבקת רכיבים שהועתקו בעורך (מחוץ לשדות טקסט), אחרת הדבקת טקסט רגילה
+      const tg = e.target || {};
+      if (!/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName || '') && !tg.isContentEditable && deck && deck.slides[sel] && deck.slides[sel].type === 'canvas') { e.preventDefault(); pasteItems(); }
+      return;
+    }
     e.preventDefault();
     place(await uploadAll(g.files), null, null);
   });
@@ -984,6 +1032,8 @@
       if (mv) { e.preventDefault(); list.forEach((i) => { const it = s_.items[i]; it.x = (it.x || 0) + mv[0]; it.y = (it.y || 0) + mv[1]; }); changed(); renderPreview(); renderForm(); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delItem(); }
       else if ((e.ctrlKey || e.metaKey) && kc('D', 'd')) { e.preventDefault(); dupItem(); }
+      else if ((e.ctrlKey || e.metaKey) && kc('C', 'c')) { e.preventDefault(); copyItems(false); }
+      else if ((e.ctrlKey || e.metaKey) && kc('X', 'x')) { e.preventDefault(); copyItems(true); }
     }
   });
 

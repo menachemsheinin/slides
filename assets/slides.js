@@ -869,18 +869,9 @@
     xor: 'XOR: הפלט 1 אם הקלטים שונים זה מזה.',
     not: 'NOT: הופך. 1 הופך ל-0, ו-0 הופך ל-1.',
   };
-  TYPES.gate = {
-    label: 'שער לוגי (AND, OR, XOR, NOT)',
-    fields: [
-      { k: 'title', t: 'text', label: 'כותרת' },
-      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
-      { k: 'gate', t: 'select', label: 'שער התחלתי', opts: [['and', 'AND'], ['or', 'OR'], ['xor', 'XOR'], ['not', 'NOT']] },
-    ],
-    blank: () => ({ type: 'gate', title: 'שער לוגי', explain: 'שער מקבל 0 או 1 ומחזיר 0 או 1 לפי כלל קבוע. לחצו על המתגים.', gate: 'and', notes: '' }),
-    cls: () => 's-gate',
-    render: (s) => {
+  const gateParts = (gate0) => {
       const st = { A: false, B: false };
-      let gate = GATE_SHAPES[s.gate] ? s.gate : 'and';
+      let gate = GATE_SHAPES[gate0] ? gate0 : 'and';
       const box = h('div', { class: 'gt-svg' });
       const tbl = h('div', { class: 'gt-tbl' });
       const rule = h('p', { class: 'gt-rule' });
@@ -927,13 +918,474 @@
         const r = e.target.closest && e.target.closest('rect[data-in]');
         if (r) { const k = r.getAttribute('data-in'); st[k] = !st[k]; draw(); }
       });
+    draw();
+    return { box, tbl, rule, btns };
+  };
+
+  TYPES.gate = {
+    label: 'שער לוגי (AND, OR, XOR, NOT)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'gate', t: 'select', label: 'שער התחלתי', opts: [['and', 'AND'], ['or', 'OR'], ['xor', 'XOR'], ['not', 'NOT']] },
+    ],
+    blank: () => ({ type: 'gate', title: 'שער לוגי', explain: 'שער מקבל 0 או 1 ומחזיר 0 או 1 לפי כלל קבוע. לחצו על המתגים.', gate: 'and', notes: '' }),
+    cls: () => 's-gate',
+    render: (s) => {
+      const p = gateParts(s.gate);
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' },
+          h('div', { class: 'gt-row' }, p.box, p.tbl),
+          p.rule,
+          h('div', { class: 'cs-ctrl' }, p.btns)),
+      ];
+    },
+  };
+
+  /* שער לוגי מכני: גלגלי שיניים. מתג דולק = הגלגל במקומו (משולב), כבוי = מורם החוצה.
+     כל הגלגלים זהים, והשיניים מסונכרנות לפי כיוון הצירים כדי שיילכו זו בתוך זו בלי להתנגש */
+  const GEAR = { R: 38, n: 12, tip: 6, root: 8 };
+  const gearD = (() => {
+    const { R, n, tip, root } = GEAR, p = (2 * Math.PI) / n, Ro = R + tip, Ri = R - root;
+    const P = (r, a) => (r * Math.cos(a)).toFixed(2) + ' ' + (r * Math.sin(a)).toFixed(2);
+    let d = '';
+    for (let k = 0; k < n; k++) {
+      const a = k * p;
+      d += (k ? 'A' + Ri + ' ' + Ri + ' 0 0 1 ' : 'M') + P(Ri, a - 0.23 * p) + ' L' + P(Ro, a - 0.12 * p) + ' L' + P(Ro, a + 0.12 * p) + ' L' + P(Ri, a + 0.23 * p) + ' ';
+    }
+    return d + 'A' + Ri + ' ' + Ri + ' 0 0 1 ' + P(Ri, -0.23 * p) + ' Z';
+  })();
+  const gearHoles = [0, 1, 2, 3, 4].map((k) => {
+    const a = (k * 2 * Math.PI) / 5 - Math.PI / 2;
+    return '<circle cx="' + (24 * Math.cos(a)).toFixed(1) + '" cy="' + (24 * Math.sin(a)).toFixed(1) + '" r="5.5" fill="#F1EDE2" stroke="#333" stroke-width="2"/>';
+  }).join('');
+  const GQ = GEAR.R * Math.SQRT2;
+  const GEAR_LAYOUT = {
+    and: {
+      g: [['D', 205, 150, 1], ['A', 281, 150, -1], ['B', 357, 150, 1], ['O', 433, 150, -1]],
+      e: [['D', 'A'], ['A', 'B'], ['B', 'O']],
+      lift: { A: [0, -76], B: [0, -76] },
+      pow: (st) => ({ D: 1, A: st.A, B: st.A && st.B, O: st.A && st.B }),
+      txt: 'AND (שרשרת): הפלט מסתובב רק אם שני הגלגלים, A וגם B, במקומם.',
+    },
+    or: {
+      g: [['D', 205, 150, 1], ['A', 205 + GQ, 150 - GQ, -1], ['B', 205 + GQ, 150 + GQ, -1], ['O', 205 + 2 * GQ, 150, 1]],
+      e: [['D', 'A'], ['D', 'B'], ['A', 'O'], ['B', 'O']],
+      lift: { A: [0, -46], B: [0, 46] },
+      pow: (st) => ({ D: 1, A: st.A, B: st.B, O: st.A || st.B }),
+      txt: 'OR (שני מסלולים): הפלט מסתובב אם לפחות אחד מהגלגלים, A או B, במקומו.',
+    },
+  };
+  function gearPhases(L) {
+    const pos = {}; L.g.forEach(([id, x, y]) => { pos[id] = [x, y]; });
+    const root = L.g[0][0], phi = { [root]: 0 }, todo = [root];
+    while (todo.length) {
+      const a = todo.shift();
+      L.e.forEach(([u, v]) => {
+        const o = u === a ? v : v === a ? u : null;
+        if (!o || phi[o] !== undefined) return;
+        const al = Math.atan2(pos[o][1] - pos[a][1], pos[o][0] - pos[a][0]);
+        phi[o] = 2 * al + Math.PI - Math.PI / GEAR.n - phi[a];
+        todo.push(o);
+      });
+    }
+    return phi;
+  }
+  TYPES.gears = {
+    label: 'שער לוגי מכני (גלגלי שיניים)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'gate', t: 'select', label: 'שער התחלתי', opts: [['and', 'AND'], ['or', 'OR']] },
+    ],
+    blank: () => ({ type: 'gears', title: 'שער לוגי בלי חשמל', explain: 'מנוע מסובב גלגלי שיניים. מתג דולק: הגלגל במקומו. כבוי: מורם החוצה.', gate: 'and', notes: '' }),
+    cls: () => 's-gears',
+    render: (s) => {
+      const st = { A: true, B: true };
+      let mode = GEAR_LAYOUT[s.gate] ? s.gate : 'and', lay = null, gs = {};
+      const box = h('div', { class: 'gr-svg' });
+      const rule = h('p', { class: 'gt-rule' });
+      const noFocus = (e) => e.preventDefault();
+      const MODES = [['and', 'AND'], ['or', 'OR']];
+      const btns = MODES.map(([k, label]) => h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => { mode = k; build(); } }, label));
+      const pill = (key, cy) =>
+        '<g data-pill="' + key + '"><rect class="gp-bg" x="20" y="' + (cy - 25) + '" width="100" height="50" rx="25" fill="#2B8A3E"/>' +
+        '<circle class="gp-kn" cx="95" cy="' + cy + '" r="20" fill="#fff" stroke="#00000033" stroke-width="2"/>' +
+        '<text x="70" y="' + (cy - 36) + '" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">' + key + '</text>' +
+        '<rect data-in="' + key + '" x="10" y="' + (cy - 42) + '" width="120" height="84" fill="transparent" style="cursor:pointer"/></g>';
+      const upd = () => {
+        const pw = lay.pow(st);
+        lay.g.forEach(([id]) => {
+          const g = gs[id], lf = lay.lift[id], up = lf && !st[id];
+          g.w.style.transform = 'translate(' + (g.x + (up ? lf[0] : 0)) + 'px,' + (g.y + (up ? lf[1] : 0)) + 'px)';
+          g.w.style.opacity = up ? 0.55 : 1;
+          g.on = !!pw[id];
+          g.body.setAttribute('fill', pw[id] ? '#FDE6D6' : '#FBF8F0');
+        });
+        const out = !!pw.O;
+        box.querySelector('.gr-shaft').setAttribute('stroke', out ? '#E8590C' : '#9A958A');
+        box.querySelector('.gr-glow').setAttribute('opacity', out ? 0.45 : 0);
+        box.querySelector('.gr-lamp').setAttribute('fill', out ? '#FFE066' : '#E4E0D4');
+        box.querySelector('.gr-dig').textContent = out ? '1' : '0';
+        ['A', 'B'].forEach((k) => {
+          const g = box.querySelector('[data-pill="' + k + '"]');
+          g.querySelector('.gp-bg').setAttribute('fill', st[k] ? '#2B8A3E' : '#B9B4A8');
+          g.querySelector('.gp-kn').setAttribute('cx', st[k] ? 95 : 45);
+        });
+        rule.textContent = lay.txt;
+        MODES.forEach(([k], i) => btns[i].classList.toggle('on', k === mode));
+      };
+      const build = () => {
+        lay = GEAR_LAYOUT[mode];
+        const phi = gearPhases(lay), O = lay.g.find((g) => g[0] === 'O');
+        let svg = '<svg viewBox="10 0 650 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="שער לוגי מכני">';
+        svg += '<path class="gr-shaft" d="M' + O[1] + ' ' + O[2] + ' H545" fill="none" stroke="#9A958A" stroke-width="9" stroke-linecap="round"/>';
+        lay.g.forEach(([id, x, y]) => {
+          svg += '<g class="gr-w" data-g="' + id + '" style="transform:translate(' + x + 'px,' + y + 'px)"><g class="gr-r" transform="rotate(' + (phi[id] * 180 / Math.PI).toFixed(2) + ')">' +
+            '<path d="' + gearD + '" fill="#FBF8F0" stroke="#333" stroke-width="2.6" stroke-linejoin="round"/>' + gearHoles + '</g>' +
+            (id === 'A' || id === 'B' ? '<text y="9" text-anchor="middle" font-size="26" font-weight="800" font-family="Arial" fill="#1C7ED6">' + id + '</text>' : '') + '</g>';
+        });
+        svg += '<text x="155" y="159" text-anchor="end" font-size="28" font-weight="700" fill="#6A645A">הנעה</text>';
+        svg += pill('A', 62) + pill('B', 238);
+        svg += '<circle class="gr-glow" cx="585" cy="150" r="66" fill="#FFE066" opacity="0"/>';
+        svg += '<circle class="gr-lamp" cx="585" cy="150" r="42" fill="#E4E0D4" stroke="#333" stroke-width="6"/>';
+        svg += '<text class="gr-dig" x="585" y="166" text-anchor="middle" font-size="46" font-weight="800" font-family="Arial" fill="#333">0</text>';
+        svg += '<text x="585" y="227" text-anchor="middle" font-size="28" font-weight="700" fill="#6A645A">פלט</text>';
+        box.innerHTML = svg + '</svg>';
+        gs = {};
+        lay.g.forEach(([id, x, y, sg]) => {
+          const w = box.querySelector('[data-g="' + id + '"]'), deg = phi[id] * 180 / Math.PI;
+          gs[id] = { w, r: w.querySelector('.gr-r'), body: w.querySelector('path'), x, y, s: sg, phi: deg, ang: deg, on: false };
+        });
+        upd();
+      };
+      box.addEventListener('click', (e) => {
+        const r = e.target.closest && e.target.closest('rect[data-in]');
+        if (r) { const k = r.getAttribute('data-in'); st[k] = !st[k]; upd(); }
+      });
+      build();
+      let seen = false, idle = 0;
+      const t0 = performance.now();
+      const tick = (now) => {
+        if (box.isConnected) seen = true; else if (seen || ++idle > 600) return;
+        const T = (now - t0) / 1000;
+        Object.keys(gs).forEach((id) => {
+          const g = gs[id];
+          if (g.on) g.ang = g.s * 60 * T + g.phi;
+          g.r.setAttribute('transform', 'rotate(' + g.ang.toFixed(2) + ')');
+        });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' },
+          h('div', { class: 'gr-row' }, box),
+          rule,
+          h('div', { class: 'cs-ctrl' }, btns)),
+      ];
+    },
+  };
+
+  /* שרשרת גלגלים עם נורות: גלגל שמסתובב מדליק את הנורה שלו. מראה מי תלוי במי */
+  const GC_Y = 164;
+  const GEARCHAIN = {
+    series: {
+      g: [['D', 130, GC_Y, 1, 'm'], ['A', 206, GC_Y, -1, 'A'], ['L1', 282, GC_Y, 1, 'l'], ['L2', 358, GC_Y, -1, 'l'], ['B', 434, GC_Y, 1, 'B'], ['L3', 510, GC_Y, -1, 'l']],
+      e: [['D', 'A'], ['A', 'L1'], ['L1', 'L2'], ['L2', 'B'], ['B', 'L3']],
+      lift: { A: [0, -76], B: [0, -76] },
+      pills: { A: [206, 262], B: [434, 262] },
+      pow: (st) => ({ D: 1, A: st.A, L1: st.A, L2: st.A, B: st.A && st.B, L3: st.A && st.B }),
+      txt: 'טורי: A מפעיל שתי נורות. B מפעיל נורה אחת, ורק אם A דולק.',
+    },
+    branch: {
+      g: [['D', 130, GC_Y, 1, 'm'], ['A', 130 + GQ, GC_Y - GQ, -1, 'A'], ['L1', 206 + GQ, GC_Y - GQ, 1, 'l'], ['L2', 282 + GQ, GC_Y - GQ, -1, 'l'],
+        ['B', 130 + GQ, GC_Y + GQ, -1, 'B'], ['L3', 206 + GQ, GC_Y + GQ, 1, 'l']],
+      e: [['D', 'A'], ['A', 'L1'], ['L1', 'L2'], ['D', 'B'], ['B', 'L3']],
+      lift: { A: [0, -56], B: [0, 56] },
+      pills: { A: [520, GC_Y - GQ], B: [520, GC_Y + GQ] },
+      pow: (st) => ({ D: 1, A: st.A, L1: st.A, L2: st.A, B: st.B, L3: st.B }),
+      txt: 'מסלולים נפרדים: A מפעיל שתי נורות, B מפעיל נורה אחת, בלי תלות זה בזה.',
+    },
+    layers: {
+      g: [['M', 130, GC_Y, 1, 'm'], ['C', 130 + GQ, GC_Y - GQ, -1, 'C'], ['A', 206 + GQ, GC_Y - GQ, 1, 'a'], ['L1', 282 + GQ, GC_Y - GQ, -1, 'l'], ['L2', 358 + GQ, GC_Y - GQ, 1, 'l'],
+        ['D', 130 + GQ, GC_Y + GQ, -1, 'D'], ['B', 206 + GQ, GC_Y + GQ, 1, 'b'], ['L3', 282 + GQ, GC_Y + GQ, -1, 'l']],
+      e: [['M', 'C'], ['C', 'A'], ['A', 'L1'], ['L1', 'L2'], ['M', 'D'], ['D', 'B'], ['B', 'L3']],
+      lift: { C: [0, -56], D: [0, 56] },
+      pills: { C: [540, GC_Y - GQ], D: [540, GC_Y + GQ] },
+      pow: (st) => ({ M: 1, C: st.C, A: st.C, L1: st.C, L2: st.C, D: st.D, B: st.D, L3: st.D }),
+      txt: 'C מסובב את A ושתי נורות. D מסובב את B ונורה אחת.',
+    },
+  };
+  TYPES.gearchain = {
+    label: 'שרשרת גלגלים עם נורות',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'mode', t: 'select', label: 'מצב התחלתי', opts: [['series', 'טורי'], ['branch', 'מסלולים נפרדים'], ['layers', 'A ו-B הם גלגלים']] },
+    ],
+    blank: () => ({ type: 'gearchain', title: 'מי מפעיל כמה נורות?', explain: 'גלגל מסתובב = הנורה שלו דולקת. A מפעיל שתי נורות, B רק אחת.', mode: 'series', notes: '' }),
+    cls: () => 's-gears',
+    render: (s) => {
+      const st = { A: true, B: true, C: true, D: true };
+      let mode = GEARCHAIN[s.mode] ? s.mode : 'series', lay = null, gs = {};
+      const box = h('div', { class: 'gr-svg' });
+      const rule = h('p', { class: 'gt-rule' });
+      const noFocus = (e) => e.preventDefault();
+      const MODES = [['series', 'טורי'], ['branch', 'מסלולים נפרדים'], ['layers', 'A ו-B הם גלגלים']];
+      const btns = MODES.map(([k, label]) => h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => { mode = k; build(); } }, label));
+      const pill = (key, cx, cy) =>
+        '<g data-pill="' + key + '"><rect class="gp-bg" x="' + (cx - 50) + '" y="' + (cy - 25) + '" width="100" height="50" rx="25" fill="#2B8A3E"/>' +
+        '<circle class="gp-kn" cx="' + (cx + 25) + '" cy="' + cy + '" r="20" fill="#fff" stroke="#00000033" stroke-width="2"/>' +
+        '<text x="' + cx + '" y="' + (cy - 36) + '" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">' + key + '</text>' +
+        '<rect data-in="' + key + '" x="' + (cx - 60) + '" y="' + (cy - 42) + '" width="120" height="84" fill="transparent" style="cursor:pointer"/></g>';
+      const upd = () => {
+        const pw = lay.pow(st);
+        lay.g.forEach(([id, , , , kind]) => {
+          const g = gs[id], lf = lay.lift[id], up = lf && !st[id];
+          g.w.style.transform = 'translate(' + (g.x + (up ? lf[0] : 0)) + 'px,' + (g.y + (up ? lf[1] : 0)) + 'px)';
+          g.w.style.opacity = up ? 0.55 : 1;
+          g.on = !!pw[id];
+          g.body.setAttribute('fill', pw[id] ? '#FDE6D6' : '#FBF8F0');
+          if (kind === 'l') {
+            g.bulb.setAttribute('fill', pw[id] ? '#FFE066' : '#E4E0D4');
+            g.glow.setAttribute('opacity', pw[id] ? 0.7 : 0);
+          }
+        });
+        Object.keys(lay.pills).forEach((k) => {
+          const g = box.querySelector('[data-pill="' + k + '"]'), cx = lay.pills[k][0];
+          g.querySelector('.gp-bg').setAttribute('fill', st[k] ? '#2B8A3E' : '#B9B4A8');
+          g.querySelector('.gp-kn').setAttribute('cx', st[k] ? cx + 25 : cx - 25);
+        });
+        rule.textContent = lay.txt;
+        MODES.forEach(([k], i) => btns[i].classList.toggle('on', k === mode));
+      };
+      const build = () => {
+        lay = GEARCHAIN[mode];
+        const phi = gearPhases(lay);
+        let svg = '<svg viewBox="0 5 590 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="שרשרת גלגלי שיניים עם נורות">';
+        lay.g.forEach(([id, x, y, , kind]) => {
+          svg += '<g class="gr-w" data-g="' + id + '" style="transform:translate(' + x + 'px,' + y + 'px)"><g class="gr-r" transform="rotate(' + (phi[id] * 180 / Math.PI).toFixed(2) + ')">' +
+            '<path d="' + gearD + '" fill="#FBF8F0" stroke="#333" stroke-width="2.6" stroke-linejoin="round"/>' + gearHoles + '</g>' +
+            (/^[ABCD]$/.test(kind) ? '<text y="9" text-anchor="middle" font-size="26" font-weight="800" font-family="Arial" fill="#1C7ED6">' + kind + '</text>'
+              : /^[ab]$/.test(kind) ? '<text y="9" text-anchor="middle" font-size="26" font-weight="800" font-family="Arial" fill="#333">' + kind.toUpperCase() + '</text>' : '') +
+            (kind === 'l' ? '<circle class="gc-glow" r="19" fill="#FFE066" opacity="0"/><circle class="gc-bulb" r="11" fill="#E4E0D4" stroke="#333" stroke-width="3"/>' : '') + '</g>';
+        });
+        svg += '<text x="78" y="173" text-anchor="end" font-size="28" font-weight="700" fill="#6A645A">הנעה</text>';
+        Object.keys(lay.pills).forEach((k) => { svg += pill(k, lay.pills[k][0], lay.pills[k][1]); });
+        box.innerHTML = svg + '</svg>';
+        gs = {};
+        lay.g.forEach(([id, x, y, sg, kind]) => {
+          const w = box.querySelector('[data-g="' + id + '"]'), deg = phi[id] * 180 / Math.PI;
+          gs[id] = { w, r: w.querySelector('.gr-r'), body: w.querySelector('path'), x, y, s: sg, phi: deg, ang: deg, on: false,
+            bulb: kind === 'l' ? w.querySelector('.gc-bulb') : null, glow: kind === 'l' ? w.querySelector('.gc-glow') : null };
+        });
+        upd();
+      };
+      box.addEventListener('click', (e) => {
+        const r = e.target.closest && e.target.closest('rect[data-in]');
+        if (r) { const k = r.getAttribute('data-in'); st[k] = !st[k]; upd(); }
+      });
+      build();
+      let seen = false, idle = 0;
+      const t0 = performance.now();
+      const tick = (now) => {
+        if (box.isConnected) seen = true; else if (seen || ++idle > 600) return;
+        const T = (now - t0) / 1000;
+        Object.keys(gs).forEach((id) => {
+          const g = gs[id];
+          if (g.on) g.ang = g.s * 60 * T + g.phi;
+          g.r.setAttribute('transform', 'rotate(' + g.ang.toFixed(2) + ')');
+        });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' },
+          h('div', { class: 'gr-row' }, box),
+          rule,
+          h('div', { class: 'cs-ctrl' }, btns)),
+      ];
+    },
+  };
+
+  /* מחבר חצי: שני מתגים, XOR קובע את הספרה ו-AND קובע אם 1 עולה לעמודה הבאה */
+  TYPES.halfadder = {
+    label: 'מחבר חצי (XOR ו-AND)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+    ],
+    blank: () => ({ type: 'halfadder', title: 'איך מחשבים חיבור? עם שערים', explain: 'בבינארי יש רק 0 ו-1, ולכן 1+1 נותן 0 בעמודה ו-1 עולה לעמודה הבאה. XOR קובע את הספרה, AND קובע אם 1 עולה.', notes: '' }),
+    cls: () => 's-adder',
+    render: (s) => {
+      const st = { A: true, B: true };
+      const box = h('div', { class: 'gr-svg' });
+      const eq = h('p', { class: 'ad-eq' });
+      const w = (on) => 'fill="none" stroke="' + (on ? '#E8590C' : '#9A958A') + '" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"';
+      const pill = (key, cy, on) =>
+        '<g><rect x="20" y="' + (cy - 25) + '" width="100" height="50" rx="25" fill="' + (on ? '#2B8A3E' : '#B9B4A8') + '"/>' +
+        '<circle cx="' + (on ? 95 : 45) + '" cy="' + cy + '" r="20" fill="#fff" stroke="#00000033" stroke-width="2"/>' +
+        '<text x="70" y="' + (cy - 36) + '" text-anchor="middle" font-size="30" font-weight="800" font-family="Arial" fill="#1C7ED6">' + key + '</text>' +
+        '<rect data-in="' + key + '" x="10" y="' + (cy - 42) + '" width="120" height="84" fill="transparent" style="cursor:pointer"/></g>';
+      const lamp = (cx, cy, on) =>
+        '<circle cx="' + cx + '" cy="' + cy + '" r="64" fill="#FFE066" opacity="' + (on ? 0.45 : 0) + '"/>' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="38" fill="' + (on ? '#FFE066' : '#E4E0D4') + '" stroke="#333" stroke-width="6"/>' +
+        '<path d="M' + (cx - 27) + ' ' + (cy - 27) + ' L' + (cx + 27) + ' ' + (cy + 27) + ' M' + (cx + 27) + ' ' + (cy - 27) + ' L' + (cx - 27) + ' ' + (cy + 27) + '" stroke="#333" stroke-width="5" stroke-linecap="round"/>';
+      const lab = (x, y, txt) => '<text x="' + x + '" y="' + y + '" text-anchor="middle" font-size="28" font-weight="700" fill="#6A645A">' + txt + '</text>';
+      const draw = () => {
+        const A = st.A, B = st.B, sum = A !== B, carry = A && B;
+        const dX = -60, dA = 80; // הזזת צורות השערים (מצוירות סביב y=140) למרכזים 80 ו-220
+        let svg = '<svg viewBox="0 -28 760 328" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="מחבר חצי">';
+        svg += '<path ' + w(B) + ' d="M215 255 V115 H275"/>' + '<path ' + w(B) + ' d="M120 255 H275"/>';
+        svg += '<path ' + w(A) + ' d="M120 45 H275"/>' + '<path ' + w(A) + ' d="M175 45 V185 H275"/>';
+        svg += '<circle cx="175" cy="45" r="9" fill="' + (A ? '#E8590C' : '#9A958A') + '"/><circle cx="215" cy="255" r="9" fill="' + (B ? '#E8590C' : '#9A958A') + '"/>';
+        svg += '<path ' + w(sum) + ' d="M395 80 H525"/><path ' + w(carry) + ' d="M395 220 H525"/>';
+        svg += '<g transform="translate(0,' + dX + ')"><path d="M270 80 Q335 80 395 140 Q335 200 270 200 Q300 140 270 80 Z" fill="#FBF8F0" stroke="#333" stroke-width="6" stroke-linejoin="round"/>' +
+          '<path d="M252 80 Q282 140 252 200" fill="none" stroke="#333" stroke-width="5" stroke-linecap="round"/></g>';
+        svg += '<g transform="translate(0,' + dA + ')"><path d="M270 80 H335 A60 60 0 0 1 335 200 H270 Z" fill="#FBF8F0" stroke="#333" stroke-width="6" stroke-linejoin="round"/></g>';
+        svg += '<text x="325" y="90" text-anchor="middle" font-size="26" font-weight="800" font-family="Arial" fill="#6A645A">XOR</text>';
+        svg += '<text x="318" y="230" text-anchor="middle" font-size="26" font-weight="800" font-family="Arial" fill="#6A645A">AND</text>';
+        svg += pill('A', 45, A) + pill('B', 255, B);
+        svg += lamp(590, 80, sum) + lamp(590, 220, carry);
+        svg += lab(590, 148, 'ספרה בעמודה') + lab(590, 288, 'עולה לעמודה הבאה');
+        box.innerHTML = svg + '</svg>';
+        eq.innerHTML = '<span dir="ltr">' + (+A) + ' + ' + (+B) + ' = ' + (+carry) + (+sum) + '</span> <small>בבינארי, כלומר ' + (+A + +B) + ' בעשרוני</small>';
+      };
+      box.addEventListener('click', (e) => {
+        const r = e.target.closest && e.target.closest('rect[data-in]');
+        if (r) { const k = r.getAttribute('data-in'); st[k] = !st[k]; draw(); }
+      });
+      draw();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' }, h('div', { class: 'gr-row' }, box), eq),
+      ];
+    },
+  };
+
+  /* מחבר של 4 ביטים: שורת מתגים לכל מספר, נורות לתוצאה, וה-1 העולה עובר מעמודה לעמודה */
+  TYPES.adder4 = {
+    label: 'מחשבון: מחבר של 4 ביטים',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+    ],
+    blank: () => ({ type: 'adder4', title: 'מחשבון: חיבור בבינארי', explain: 'כל עמודה מחברת את הביטים שלה. אם יוצא יותר מדי, 1 עולה לעמודה הבאה, כמו בחיבור בכתב.', notes: '' }),
+    cls: () => 's-adder',
+    render: (s) => {
+      const a = [0, 1, 0, 1], b = [0, 0, 1, 1]; // 5 + 3 (עמודות 8,4,2,1)
+      const box = h('div', { class: 'gr-svg' });
+      const eq = h('p', { class: 'ad-eq' });
+      const XS = [190, 300, 410, 520, 630]; // עמודות 16,8,4,2,1
+      const val = (v) => v[0] * 8 + v[1] * 4 + v[2] * 2 + v[3];
+      const setBits = (v, n) => { for (let i = 0; i < 4; i++) v[i] = (n >> (3 - i)) & 1; };
+      const calc = () => {
+        let c = 0; const sum = [0, 0, 0, 0], co = [0, 0, 0, 0];
+        for (let i = 3; i >= 0; i--) { const tt = a[i] + b[i] + c; sum[i] = tt & 1; co[i] = tt >> 1; c = co[i]; }
+        return { sum, co, top: c };
+      };
+      const pill = (id, cx, cy, on) =>
+        '<rect x="' + (cx - 38) + '" y="' + (cy - 19) + '" width="76" height="38" rx="19" fill="' + (on ? '#2B8A3E' : '#B9B4A8') + '"/>' +
+        '<circle cx="' + (cx + (on ? 19 : -19)) + '" cy="' + cy + '" r="15" fill="#fff" stroke="#00000033" stroke-width="2"/>' +
+        '<rect data-bit="' + id + '" x="' + (cx - 48) + '" y="' + (cy - 28) + '" width="96" height="56" fill="transparent" style="cursor:pointer"/>';
+      const txt = (x, y, str, size, fill, anchor) => '<text x="' + x + '" y="' + y + '" text-anchor="' + (anchor || 'middle') + '" font-size="' + size + '" font-weight="800" font-family="Arial" fill="' + fill + '">' + str + '</text>';
+      const draw = () => {
+        const r = calc();
+        let svg = '<svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="מחבר של ארבעה ביטים">';
+        [16, 8, 4, 2, 1].forEach((v, k) => { svg += txt(XS[k], 24, v, 26, '#8A857A'); });
+        svg += txt(125, 80, 'A', 34, '#1C7ED6', 'end') + txt(125, 140, 'B', 34, '#1C7ED6', 'end');
+        svg += '<text x="125" y="203" text-anchor="end" font-size="26" font-weight="700" fill="#6A645A">עולה</text>';
+        svg += '<text x="125" y="256" text-anchor="end" font-size="26" font-weight="700" fill="#6A645A">תוצאה</text><text x="125" y="280" text-anchor="end" font-size="20" font-weight="600" fill="#8A857A">בבינארי</text>';
+        for (let i = 0; i < 4; i++) {
+          svg += pill('a' + i, XS[i + 1], 70, a[i]) + pill('b' + i, XS[i + 1], 130, b[i]);
+        }
+        svg += '<path d="M150 166 H680" stroke="#333" stroke-width="4" stroke-linecap="round"/>';
+        for (let i = 0; i < 4; i++) { // 1 שעולה מעמודה i ונכנס לעמודה משמאלה
+          const x = XS[i + 1] - 55, on = r.co[i];
+          svg += '<circle cx="' + x + '" cy="196" r="17" fill="' + (on ? '#FFE066' : '#EDE8DA') + '" stroke="#333" stroke-width="3"/>' + txt(x, 205, on, 24, '#333');
+        }
+        const bits = [r.top, r.sum[0], r.sum[1], r.sum[2], r.sum[3]];
+        bits.forEach((on, k) => {
+          svg += '<circle cx="' + XS[k] + '" cy="252" r="34" fill="#FFE066" opacity="' + (on ? 0.45 : 0) + '"/>' +
+            '<circle cx="' + XS[k] + '" cy="252" r="24" fill="' + (on ? '#FFE066' : '#E4E0D4') + '" stroke="#333" stroke-width="5"/>' + txt(XS[k], 262, on, 28, '#333');
+        });
+        box.innerHTML = svg + '</svg>';
+        eq.innerHTML = '<span dir="ltr">' + val(a) + ' + ' + val(b) + ' = ' + (val(a) + val(b)) + '</span> <small>בעשרוני</small>';
+      };
+      box.addEventListener('click', (e) => {
+        const el = e.target.closest && e.target.closest('rect[data-bit]');
+        if (!el) return;
+        const id = el.getAttribute('data-bit'), v = id[0] === 'a' ? a : b, i = +id[1];
+        v[i] = v[i] ? 0 : 1; draw();
+      });
+      const LR = (x) => '⁦' + x + '⁩'; // שהמספרים לא יתהפכו בתוך טקסט עברית
+      const PRESETS = [[5, 3, LR('5 + 3')], [7, 1, LR('7 + 1') + ': עולה בשרשרת'], [15, 1, LR('15 + 1')]];
+      const btns = PRESETS.map(([x, y, label]) => h('button', { class: 'cs-mode', type: 'button', onmousedown: (e) => e.preventDefault(), onclick: () => { setBits(a, x); setBits(b, y); draw(); } }, label));
+      draw();
+      return [
+        s.title ? h('h2', {}, s.title) : null,
+        expl(s),
+        h('div', { class: 'grow' }, h('div', { class: 'gr-row' }, box), eq, h('div', { class: 'cs-ctrl' }, btns)),
+      ];
+    },
+  };
+
+  /* השוואה בין עשרוני לבינארי: אותו מספר בשתי שפות. לחיצה על ספרה עשרונית או על מתג בינארי משנה את שניהם */
+  TYPES.binary = {
+    label: 'עשרוני מול בינארי (מתגים)',
+    fields: [
+      { k: 'title', t: 'text', label: 'כותרת' },
+      { k: 'explain', t: 'long', rows: 3, label: 'טקסט הסבר (מוצג מתחת לכותרת)' },
+      { k: 'val', t: 'num', label: 'מספר התחלתי (0 עד 255)' },
+    ],
+    blank: () => ({ type: 'binary', title: 'אותו מספר, שתי שפות', explain: 'לחצו על מתגים בבינארי או על ספרות בעשרוני, והמספר זהה בשני הצדדים.', val: 75, notes: '' }),
+    cls: () => 's-binary',
+    render: (s) => {
+      let v = Math.max(0, Math.min(255, parseInt(s.val, 10) || 0));
+      const PV = [128, 64, 32, 16, 8, 4, 2, 1], DP = [100, 10, 1];
+      const noFocus = (e) => e.preventDefault();
+      const decBox = h('div', { class: 'bd-cols' }), binBox = h('div', { class: 'bd-cols' });
+      const decSum = h('div', { class: 'bd-sum' }), binSum = h('div', { class: 'bd-sum' }), eq = h('p', { class: 'bd-eq' });
+      const draw = () => {
+        const ds = String(v).padStart(3, '0').split('').map(Number);
+        decBox.replaceChildren(...DP.map((p, i) => h('div', { class: 'bd-col' },
+          h('button', { class: 'bd-digit', type: 'button', onmousedown: noFocus, onclick: () => {
+            const nd = (ds[i] + 1) % 10, nv = v + (nd - ds[i]) * p;
+            v = nv > 255 ? v - ds[i] * p : nv; draw();
+          } }, String(ds[i])),
+          h('div', { class: 'bd-pv' }, String(p)),
+          h('div', { class: 'bd-bcd' }, ds[i].toString(2).padStart(4, '0')))));
+        binBox.replaceChildren(...PV.map((p) => {
+          const on = (v & p) !== 0;
+          return h('div', { class: 'bd-col' },
+            h('button', { class: 'bd-sw' + (on ? ' on' : ''), type: 'button', onmousedown: noFocus, onclick: () => { v ^= p; draw(); } }),
+            h('div', { class: 'bd-bit' + (on ? ' on' : '') }, on ? '1' : '0'),
+            h('div', { class: 'bd-pv' }, String(p)));
+        }));
+        const dp = DP.map((p, i) => ds[i] * p).filter(Boolean), bp = PV.filter((p) => v & p);
+        decSum.innerHTML = '<span dir="ltr">' + (dp.length ? dp.join(' + ') : '0') + ' = ' + v + '</span>';
+        binSum.innerHTML = '<span dir="ltr">' + (bp.length ? bp.join(' + ') : '0') + ' = ' + v + '</span>';
+        eq.innerHTML = '<span dir="ltr">' + v + '</span> בעשרוני = <span dir="ltr">' + v.toString(2).padStart(8, '0') + '</span> בבינארי';
+      };
+      const panel = (title, sub, cols, sum) => h('div', { class: 'bd-panel' }, h('h3', {}, title), h('p', { class: 'bd-sub' }, sub), cols, sum);
+      const PRESETS = [5, 42, 100, 255];
+      const btns = PRESETS.map((n) => h('button', { class: 'cs-mode', type: 'button', onmousedown: noFocus, onclick: () => { v = n; draw(); } }, String(n)));
       draw();
       return [
         s.title ? h('h2', {}, s.title) : null,
         expl(s),
         h('div', { class: 'grow' },
-          h('div', { class: 'gt-row' }, box, tbl),
-          rule,
+          h('div', { class: 'bd-row' },
+            panel('בינארי: בסיס 2', 'שתי ספרות בלבד (0 ו-1). כל עמודה שווה פי 2 מהקודמת', binBox, binSum),
+            panel('עשרוני: בסיס 10', 'עשר ספרות (0 עד 9). כל עמודה שווה פי 10 מהקודמת', decBox, decSum)),
+          eq,
           h('div', { class: 'cs-ctrl' }, btns)),
       ];
     },
@@ -941,7 +1393,7 @@
 
   /* שקף חופשי: קנבס 1920×1080 עם רכיבים במיקום מוחלט (טקסט, תמונה, טבלה). נערך בעורך בגרירה, ונקלט מ-PowerPoint בפריסה המקורית */
   const CV_FONTS = { he: "'Heebo', Arial, sans-serif", arial: 'Arial, Helvetica, sans-serif', serif: "Georgia, 'Times New Roman', serif" };
-  const cvItem = (it, i) => {
+  const cvItem = (it, i, ctx) => {
     const st = { position: 'absolute', left: (it.x || 0) + 'px', top: (it.y || 0) + 'px', width: (it.w || 200) + 'px', height: it.h ? it.h + 'px' : 'auto' };
     let inner;
     if (it.kind === 'image') {
@@ -955,6 +1407,14 @@
       inner = h('table', { style: { fontSize: (it.size || 32) + 'px', color: it.color || '#0A0A0A', fontFamily: CV_FONTS[it.font] || CV_FONTS.he } },
         rows.map((r, ri) => h('tr', {}, r.map((c, ci) =>
           h(ri === 0 && it.header !== 'no' ? 'th' : 'td', { style: { width: cw[ci] ? cw[ci] + '%' : '', textAlign: it.align || 'right' } }, c)))));
+    } else if (it.kind === 'gate') { // חלק משער לוגי אינטראקטיבי: סרטוט, טבלה, כלל או כפתורים. כל חלק נערך בנפרד, והמצב משותף
+      const first = (ctx.items || []).find((x) => x.kind === 'gate');
+      const p = ctx.gate || (ctx.gate = gateParts(first ? first.gate : it.gate));
+      const part = it.part || 'circuit', size = (it.size || 40) + 'px';
+      if (part === 'table') inner = h('div', { class: 'cv-gate', style: { fontSize: size } }, p.tbl);
+      else if (part === 'rule') inner = h('div', { class: 'cv-gate cv-gate-rule', style: { fontSize: size } }, p.rule);
+      else if (part === 'buttons') inner = h('div', { class: 'cv-gate', style: { fontSize: size } }, h('div', { class: 'cs-ctrl' }, p.btns));
+      else inner = h('div', { class: 'cv-gate' }, p.box);
     } else if (it.kind === 'shape') {
       const w = it.w || 100, hh = it.h || 100, fill = it.fill || 'none', stroke = it.stroke || 'none', sw = it.sw || 0;
       let g;
@@ -988,7 +1448,7 @@
       items: [{ kind: 'text', text: 'כותרת', x: 240, y: 400, w: 1440, h: 160, size: 96, bold: '1', color: '#C00000', align: 'center', font: 'he', lh: 1.2, list: '', link: '' }],
     }),
     cls: () => 's-canvas',
-    render: (s) => [h('div', { class: 'cv', style: { background: s.bg || '#FFFFFF' } }, (s.items || []).map(cvItem))],
+    render: (s) => [h('div', { class: 'cv', style: { background: s.bg || '#FFFFFF' } }, (() => { const ctx = { items: s.items || [] }; return (s.items || []).map((it, i) => cvItem(it, i, ctx)); })())],
   };
 
   /* לוגו בפינת כל שקף. הצורות מצוירות מחדש כווקטור, בצבע הטקסט: שחור על שקף בהיר, לבן על כהה/צבעוני (ראו .logo ב-CSS) */
