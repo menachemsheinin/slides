@@ -166,6 +166,42 @@
       return { def: s, el, steps };
     });
 
+    // מצב ייצוא (?export=1): כל השקפים ברצף, כל הרכיבים גלויים, בלי כפתורים. משמש להדפסה ל-PDF בשרת העריכה
+    if (new URLSearchParams(location.search).has('export')) {
+      document.body.classList.add('exporting');
+      // סרטון: תיבה כהה עם משולש play שהוא קישור לסרטון (ב-PDF הקישור לחיץ), ותמונה ממוזערת של יוטיוב אם יש
+      const waits = [];
+      const watchUrl = (src) => {
+        let m = src.match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]+)(?:\?.*?start=(\d+))?/);
+        if (m) return { url: 'https://www.youtube.com/watch?v=' + m[1] + (m[2] ? '&t=' + m[2] + 's' : ''), thumb: 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' };
+        return { url: src, thumb: '' };
+      };
+      slides.forEach((s) => {
+        s.el.classList.add('on');
+        s.el.querySelectorAll('[data-step]').forEach((n) => n.classList.add('on'));
+        s.el.querySelectorAll('a[href*="/embed/"]').forEach((a) => { a.href = watchUrl(a.href).url; });
+        s.el.querySelectorAll('iframe, video').forEach((n) => {
+          const src = n.getAttribute('src') || '';
+          const w = /^https?:\/\//.test(src) ? watchUrl(src) : null;
+          const play = h('span', { class: 'vl-play' });
+          const box = w ? h('a', { class: 'vid-link', href: w.url }, play) : h('div', { class: 'vid-link' }, play);
+          if (w && w.thumb) {
+            waits.push(new Promise((ok) => {
+              const im = new Image();
+              im.onload = () => { box.style.backgroundImage = 'url(' + w.thumb + ')'; ok(); };
+              im.onerror = ok;
+              im.src = w.thumb;
+              setTimeout(ok, 8000);
+            }));
+          }
+          n.replaceWith(box);
+        });
+      });
+      const done = () => { document.body.dataset.ready = '1'; };
+      Promise.all([document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve(), ...waits]).then(() => setTimeout(done, 600));
+      return;
+    }
+
     // כפתור עריכה: מופיע רק כשהאתר רץ דרך שרת העריכה (edit.bat)
     if (location.protocol.startsWith('http')) {
       fetch('/api/ping', { cache: 'no-store' }).then((r) => r.ok && r.json()).then((j) => {

@@ -1398,9 +1398,17 @@
     let inner;
     if (it.kind === 'image') {
       if (it.bg) st.background = it.bg;
-      inner = it.src
-        ? h('img', { src: it.src, alt: it.alt || '', draggable: 'false', style: { width: '100%', height: '100%', objectFit: it.fit === 'contain' ? 'contain' : 'cover', display: 'block' } })
-        : h('div', { class: 'cv-empty' }, 'תמונה');
+      // חיתוך שוליים (כמו ב-PowerPoint): cl/cr/ct/cb באחוזים מהתמונה המקורית. מסגרת הרכיב היא החלק הנראה
+      const cl = Math.max(0, +it.cl || 0), cr = Math.max(0, +it.cr || 0), ct = Math.max(0, +it.ct || 0), cb = Math.max(0, +it.cb || 0);
+      if (it.src && (cl || cr || ct || cb) && cl + cr < 95 && ct + cb < 95) {
+        const fx = 100 / (100 - cl - cr), fy = 100 / (100 - ct - cb);
+        inner = h('div', { style: { position: 'relative', width: '100%', height: '100%', overflow: 'hidden' } },
+          h('img', { src: it.src, alt: it.alt || '', draggable: 'false', style: { position: 'absolute', display: 'block', objectFit: 'fill', width: fx * 100 + '%', height: fy * 100 + '%', left: -(cl * fx) + '%', top: -(ct * fy) + '%', maxWidth: 'none' } }));
+      } else {
+        inner = it.src
+          ? h('img', { src: it.src, alt: it.alt || '', draggable: 'false', style: { width: '100%', height: '100%', objectFit: it.fit === 'contain' ? 'contain' : 'cover', display: 'block' } })
+          : h('div', { class: 'cv-empty' }, 'תמונה');
+      }
     } else if (it.kind === 'table') {
       const rows = String(it.rows || '').split('\n').filter((r) => r.trim()).map((r) => r.split('|').map((c) => c.trim()));
       const cw = String(it.colw || '').split(',').map(Number);
@@ -1422,7 +1430,7 @@
       else if (it.shape === 'path') g = '<path d="' + String(it.path || '').replace(/"/g, '') + '" fill="' + (it.fill || 'none') + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linecap="round" vector-effect="non-scaling-stroke" transform="scale(' + (w / (it.vw || w)) + ' ' + (hh / (it.vh || hh)) + ')"/>';
       else { // חץ ימינה (הפוך בעזרת flip)
         const head = Math.min(w, hh) * 0.5, top = hh * 0.25, bot = hh * 0.75, nk = Math.max(0, w - head);
-        g = '<polygon points="0,' + top + ' ' + nk + ',' + top + ' ' + nk + ',0 ' + w + ',' + hh / 2 + ' ' + nk + ',' + hh + ' ' + nk + ',' + bot + ' 0,' + bot + '" fill="' + fill + '"/>';
+        g = '<polygon points="0,' + top + ' ' + nk + ',' + top + ' ' + nk + ',0 ' + w + ',' + hh / 2 + ' ' + nk + ',' + hh + ' ' + nk + ',' + bot + ' 0,' + bot + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
       }
       inner = h('div', { html: '<svg width="' + w + '" height="' + hh + '" viewBox="0 0 ' + w + ' ' + hh + '" style="overflow:visible;display:block" xmlns="http://www.w3.org/2000/svg">' + g + '</svg>' });
     } else {
